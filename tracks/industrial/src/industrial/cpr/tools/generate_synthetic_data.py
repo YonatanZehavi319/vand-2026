@@ -132,11 +132,11 @@ def generate_one(uid, save_path, info, resize, is_object, foreground_fn: str = N
     cv.imwrite(os.path.join(save_path, f'{uid}_mask.{save_format}'), anomaly_img_mask)
     return uid, k
 
-def generate(num_workers, save_path, dataset_name, resize, num, foreground_dir: str = None):
+def generate(num_workers, save_path, dataset_name, resize, num, foreground_dir: str = None, data_root='./data/mvtec'):
     logger.info(f'gen_simulated_anomaly')
     logger.info(f'save to {save_path}')
     logger.info(f'params: {num_workers} {dataset_name} {resize} {num} {foreground_dir}')
-    data_root = os.path.join('./data', dataset_name)
+    # data_root passed as parameter
     dataset_info = DATASET_INFOS[dataset_name]
     for sub_category_id, sub_category in enumerate(dataset_info[0]):  # all
         is_object = sub_category in dataset_info[1]
@@ -166,10 +166,12 @@ if __name__ == "__main__":
     parser.add_argument("--resize", type=int, default=640, help="image resize")
     parser.add_argument("--num", type=int, default=12000, help="num of synthetic samples")
     parser.add_argument("-fd", "--foreground-dir", type=str, default=None, help="foreground dir")
+    parser.add_argument("--data-root", type=str, default=None, help="dataset root dir (default: ./data/{dataset_name})")
     args = parser.parse_args()
     if args.log_path is None:
         args.log_path = f'log/synthetic_{args.dataset_name}_{args.resize}_{args.num}_{args.foreground_dir is not None}_{save_format}'
     logger.add(os.path.join(args.log_path, 'runtime.log'))
     logger.info('args: \n' + pformat(vars(args)))
     save_dependencies_files(os.path.join(args.log_path, 'src'))
-    generate(args.num_workers, args.log_path, args.dataset_name, args.resize, args.num, args.foreground_dir)
+    data_root = args.data_root or os.path.join('./data', args.dataset_name)
+    generate(args.num_workers, args.log_path, args.dataset_name, args.resize, args.num, args.foreground_dir, data_root=data_root)

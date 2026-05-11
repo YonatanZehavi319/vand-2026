@@ -40,6 +40,7 @@ def get_args_parser():
     parser.add_argument("--save-dir", type=str, default="./saved_results", help="Directory to save results")
     parser.add_argument("--bh-fdr", type=float, default=None, help="FDR rate for Benjamini-Hochberg thresholding (e.g. 0.05)")
     parser.add_argument("--validation", action="store_true", help="Run on validation/good images and save heatmaps for EVT fitting")
+    parser.add_argument("--data-root", type=str, default=None, help="dataset root dir (default: ./data/{dataset_name})")
     return parser
 
 @torch.no_grad()
@@ -326,7 +327,8 @@ def main(args):
             checkpoint_fn = args.checkpoints[0] if len(args.checkpoints) == 1 else args.checkpoints[sub_category_idx]
             if '{category}' in checkpoint_fn: checkpoint_fn = checkpoint_fn.format(category=sub_category)
             model.load_state_dict(torch.load(checkpoint_fn), strict=False)
-        root_dir = os.path.join('./data', args.dataset_name, sub_category)
+        _data_root = args.data_root or os.path.join('./data', args.dataset_name)
+        root_dir = os.path.join(_data_root, sub_category)
         train_fns = sorted(glob(os.path.join(root_dir, 'train/good/*')) or glob(os.path.join(root_dir, 'train/*/*')))
         foreground_result = {}
         with open(os.path.join(args.retrieval_dir, sub_category, 'r_result.json'), 'r') as f:

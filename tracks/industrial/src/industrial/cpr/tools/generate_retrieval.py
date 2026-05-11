@@ -20,18 +20,18 @@ from industrial.cpr.utils import COLORS, save_dependencies_files, fix_seeds
 
 
 @torch.no_grad()
-def gen_retrieval(save_path, dataset_name, model_name, layer, resize, knn, vis):
+def gen_retrieval(save_path, dataset_name, model_name, layer, resize, knn, vis, data_root='./data/mvtec'):
     device = torch.device('cuda')
     logger.info(f'gen_retrieval')
     logger.info(f'save to {save_path}')
     logger.info(f'params: {dataset_name} {model_name} {layer} {resize} {knn} {vis}')
-    assert os.path.exists(os.path.join('./data', dataset_name)), f'{dataset_name} not exists'
+    assert os.path.exists(data_root), f'{data_root} not exists'
     dataset_info = DATASET_INFOS[dataset_name]
     for sub_category in dataset_info[0]:  # all
         fix_seeds(66)
         model: BaseModel = MODEL_INFOS[model_name]['cls']([layer], input_size=resize).to(device)
         model.eval()
-        root_dir = os.path.join('./data', dataset_name, sub_category)
+        root_dir = os.path.join(data_root, sub_category)
         logger.info(f'generate {sub_category}')
         cur_target_save_path = os.path.join(save_path, sub_category)
         os.makedirs(cur_target_save_path, exist_ok=True)
@@ -67,7 +67,8 @@ def gen_retrieval(save_path, dataset_name, model_name, layer, resize, knn, vis):
                 image = cv.resize(image, (resize*2, resize*2//knn))
                 image = cv.cvtColor(image, cv.COLOR_RGB2BGR)
                 cv.imwrite(os.path.join(cur_save_dir, f'r_{cur_image_name}.png'), image)
-        for fn in tqdm(sorted(glob(os.path.join(root_dir, 'test/*/*'))), desc='retreival test data', leave=False):
+        test_dir = 'test_public' if os.path.isdir(os.path.join(root_dir, 'test_public')) else 'test'
+        for fn in tqdm(sorted(glob(os.path.join(root_dir, test_dir, '*/*.png'))), desc='retreival test data', leave=False):
             assert os.path.exists(fn), f'{fn} not exists'
             k = os.path.relpath(fn, root_dir)
             image = read_image(fn, (resize, resize))
@@ -98,6 +99,7 @@ if __name__ == "__main__":
     parser.add_argument("-lp", "--log-path", type=str, default=None, help="log path")
     # data
     parser.add_argument("--dataset-name", type=str, default="mvtec", choices=["mvtec", "mvtec_3d", "btad"], help="dataset name")
+    parser.add_argument("--data-root", type=str, default=None, help="dataset root dir (default: ./data/{dataset_name})")
     parser.add_argument("--resize", type=int, default=320, help="image resize")
     # vis
     parser.add_argument("--vis", action="store_true", help='save vis result')
@@ -116,5 +118,6 @@ if __name__ == "__main__":
     logger.info('args: \n' + pformat(vars(args)))
     assert torch.cuda.is_available(), f'cuda is not available'
     save_dependencies_files(os.path.join(args.log_path, 'src'))
-    gen_retrieval(args.log_path, args.dataset_name, args.pretrained_model, args.layer, args.resize, args.k_nearest, args.vis)
+    data_root = args.data_root or os.path.join('./data', args.dataset_name)
+    gen_retrieval(args.log_path, args.dataset_name, args.pretrained_model, args.layer, args.resize, args.k_nearest, args.vis, data_root=data_root)
     
