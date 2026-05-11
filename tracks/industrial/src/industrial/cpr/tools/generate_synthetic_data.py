@@ -30,6 +30,7 @@ perlin_scale           = 6
 min_perlin_scale       = 0
 structure_grid_size    = 16
 save_format            = 'jpg'
+DTD_DIR                = './data/dtd/images'  # overridden by --dtd-dir
 
 def generate_perlin_noise_mask(resize) -> np.ndarray:
     # define perlin noise scale
@@ -105,7 +106,7 @@ def generate_synthetic_anomaly_img(img, is_object, foreground_weight):
     # step 2. generate texture or structure anomaly
     ## anomaly source
     if np.random.uniform() < 0.5 or not is_object:
-        anomaly_source_img = read_image(random.choice(sorted(glob(os.path.join('./data/dtd/images', '*/*')))), (resize, resize)).astype(np.float32)
+        anomaly_source_img = read_image(random.choice(sorted(glob(os.path.join(DTD_DIR, '*/*')))), (resize, resize)).astype(np.float32)
     else:
         anomaly_source_img = structure_source_img(img)
     ## mask anomaly parts
@@ -132,7 +133,7 @@ def generate_one(uid, save_path, info, resize, is_object, foreground_fn: str = N
     cv.imwrite(os.path.join(save_path, f'{uid}_mask.{save_format}'), anomaly_img_mask)
     return uid, k
 
-def generate(num_workers, save_path, dataset_name, resize, num, foreground_dir: str = None, data_root='./data/mvtec'):
+def generate(num_workers, save_path, dataset_name, resize, num, foreground_dir: str = None, data_root='./data/mvtec', dtd_dir='./data/dtd/images'):
     logger.info(f'gen_simulated_anomaly')
     logger.info(f'save to {save_path}')
     logger.info(f'params: {num_workers} {dataset_name} {resize} {num} {foreground_dir}')
@@ -167,6 +168,7 @@ if __name__ == "__main__":
     parser.add_argument("--num", type=int, default=12000, help="num of synthetic samples")
     parser.add_argument("-fd", "--foreground-dir", type=str, default=None, help="foreground dir")
     parser.add_argument("--data-root", type=str, default=None, help="dataset root dir (default: ./data/{dataset_name})")
+    parser.add_argument("--dtd-dir", type=str, default='./data/dtd/images', help="DTD textures dir (default: ./data/dtd/images)")
     args = parser.parse_args()
     if args.log_path is None:
         args.log_path = f'log/synthetic_{args.dataset_name}_{args.resize}_{args.num}_{args.foreground_dir is not None}_{save_format}'
@@ -174,4 +176,6 @@ if __name__ == "__main__":
     logger.info('args: \n' + pformat(vars(args)))
     save_dependencies_files(os.path.join(args.log_path, 'src'))
     data_root = args.data_root or os.path.join('./data', args.dataset_name)
+    global DTD_DIR
+    DTD_DIR = args.dtd_dir
     generate(args.num_workers, args.log_path, args.dataset_name, args.resize, args.num, args.foreground_dir, data_root=data_root)
