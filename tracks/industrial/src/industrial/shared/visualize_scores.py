@@ -63,7 +63,9 @@ def main():
                     label = 'FP' if fp_area > 0 else 'TN'
                     good_entries.append((image_name, fp_area, label))
                 else:
-                    gt_path = os.path.join(data_dir, category, 'ground_truth', sub_dir, f'{image_name}_mask.png')
+                    gt_path_ad2 = os.path.join(data_dir, category, 'test_public', 'ground_truth', sub_dir, f'{image_name}_mask.png')
+                    gt_path_ad1 = os.path.join(data_dir, category, 'ground_truth', sub_dir, f'{image_name}_mask.png')
+                    gt_path = gt_path_ad2 if os.path.exists(gt_path_ad2) else gt_path_ad1
                     if not os.path.exists(gt_path):
                         continue
                     gt = cv.imread(gt_path, cv.IMREAD_GRAYSCALE)
