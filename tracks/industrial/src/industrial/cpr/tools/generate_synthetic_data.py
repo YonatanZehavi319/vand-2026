@@ -176,6 +176,6 @@ if __name__ == "__main__":
     logger.info('args: \n' + pformat(vars(args)))
     save_dependencies_files(os.path.join(args.log_path, 'src'))
     data_root = args.data_root or os.path.join('./data', args.dataset_name)
-    global DTD_DIR
-    DTD_DIR = args.dtd_dir
+    import industrial.cpr.tools.generate_synthetic_data as _self
+    _self.DTD_DIR = args.dtd_dir
     generate(args.num_workers, args.log_path, args.dataset_name, args.resize, args.num, args.foreground_dir, data_root=data_root)
