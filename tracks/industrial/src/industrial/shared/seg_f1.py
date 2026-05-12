@@ -23,38 +23,52 @@ def compute_seg_f1(binary_path, gt_path, resize=None):
     return precision, recall, f1
 
 
+def find_gt_path(data_dir, category, anomaly_type, image_name):
+    """Find GT mask, checking AD 2 layout then AD 1."""
+    # AD 2: {data_dir}/{category}/test_public/ground_truth/{anomaly_type}/{name}_mask.png
+    ad2 = os.path.join(data_dir, category, 'test_public', 'ground_truth', anomaly_type, f'{image_name}_mask.png')
+    if os.path.exists(ad2):
+        return ad2
+    # AD 1: {data_dir}/{category}/ground_truth/{anomaly_type}/{name}_mask.png
+    ad1 = os.path.join(data_dir, category, 'ground_truth', anomaly_type, f'{image_name}_mask.png')
+    if os.path.exists(ad1):
+        return ad1
+    return None
+
+
 def main():
     if len(sys.argv) < 3:
-        print(f"Usage: python {sys.argv[0]} <saved_results_dir> <data_dir> [--resize 320] [--bh] [--seg] [--per-image] [--item can]")
-        print(f"  e.g. python {sys.argv[0]} ./saved_results ./data/mvtec")
-        print(f"       python {sys.argv[0]} ./saved_results ./data/mvtec --item can --per-image")
+        print(f"Usage: python {sys.argv[0]} <results_dir> <data_dir> [--resize N] [--suffix _binary.png] [--per-image] [--item can]")
+        print(f"  e.g. python {sys.argv[0]} ./output /workspace/mvtec")
+        print(f"       python {sys.argv[0]} ./output /workspace/mvtec --item can --per-image")
         sys.exit(1)
 
     results_dir = sys.argv[1]
     data_dir = sys.argv[2]
     resize = None
-    use_bh = '--bh' in sys.argv
-    use_seg = '--seg' in sys.argv
     per_image = '--per-image' in sys.argv
     single_item = None
+    suffix = '_binary.png'
     if '--item' in sys.argv:
         single_item = sys.argv[sys.argv.index('--item') + 1]
     if '--resize' in sys.argv:
         resize = int(sys.argv[sys.argv.index('--resize') + 1])
+    if '--suffix' in sys.argv:
+        suffix = sys.argv[sys.argv.index('--suffix') + 1]
 
-    if use_seg:
-        suffix = '_binary_seg.png'
-        method_name = 'SegHead'
-    elif use_bh:
-        suffix = '_binary_bh.png'
-        method_name = 'BH'
-    else:
-        suffix = '_binary.png'
-        method_name = 'Otsu'
-    print(f"Method: {method_name}")
-
+    # Auto-detect heatmaps dir structure
     heatmaps_dir = os.path.join(results_dir, 'heatmaps')
-    categories = sorted(os.listdir(heatmaps_dir))
+    if not os.path.isdir(heatmaps_dir):
+        # Try results_dir directly (ensemble output puts binary in anomaly_images_thresholded/)
+        thresh_dir = os.path.join(results_dir, 'anomaly_images_thresholded')
+        if os.path.isdir(thresh_dir):
+            heatmaps_dir = thresh_dir
+            suffix = '.png'
+        else:
+            print(f"No heatmaps/ or anomaly_images_thresholded/ found in {results_dir}")
+            sys.exit(1)
+
+    categories = sorted([d for d in os.listdir(heatmaps_dir) if os.path.isdir(os.path.join(heatmaps_dir, d))])
     if single_item:
         categories = [c for c in categories if c == single_item]
         if not categories:
@@ -67,7 +81,8 @@ def main():
 
     for category in categories:
         cat_dir = os.path.join(heatmaps_dir, category)
-        anomaly_types = [d for d in sorted(os.listdir(cat_dir)) if d != 'good']
+        anomaly_types = [d for d in sorted(os.listdir(cat_dir))
+                         if os.path.isdir(os.path.join(cat_dir, d)) and d != 'good' and d != 'ground_truth']
 
         cat_tp, cat_fp, cat_fn = 0, 0, 0
         cat_results = []
@@ -77,9 +92,9 @@ def main():
 
             for binary_path in binary_files:
                 image_name = os.path.basename(binary_path).replace(suffix, '')
-                gt_path = os.path.join(data_dir, category, 'ground_truth', anomaly_type, f'{image_name}_mask.png')
+                gt_path = find_gt_path(data_dir, category, anomaly_type, image_name)
 
-                if not os.path.exists(gt_path):
+                if gt_path is None:
                     print(f"  Warning: GT not found for {category}/{anomaly_type}/{image_name}")
                     continue
 
@@ -108,7 +123,10 @@ def main():
             for atype, name, p, r, f1 in sorted(cat_results, key=lambda x: x[4]):
                 print(f"    {atype}/{name:<20} F1={f1:.4f}  P={p:.4f}  R={r:.4f}")
 
-    print(f"\n  {'Average':<15} SegF1={np.mean(all_f1s):.4f}  P={np.mean(all_precisions):.4f}  R={np.mean(all_recalls):.4f}  ({len(all_f1s)} categories)")
+    if all_f1s:
+        print(f"\n  {'Average':<15} SegF1={np.mean(all_f1s):.4f}  P={np.mean(all_precisions):.4f}  R={np.mean(all_recalls):.4f}  ({len(all_f1s)} categories)")
+    else:
+        print("\n  No results found.")
 
 
 if __name__ == '__main__':
