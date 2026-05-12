@@ -22,7 +22,7 @@ import numpy as np
 from industrial.shared.synth_lighting import apply_lighting, MODES
 
 
-def augment_category(src_dir, dst_dir, n_augmented, intensity, max_augs):
+def augment_category(src_dir, dst_dir, n_augmented, lighting_min, lighting_max, max_augs):
     """Generate augmented copies for one category's validation/good images."""
     good_dir = os.path.join(src_dir, 'validation', 'good')
     if not os.path.isdir(good_dir):
@@ -57,7 +57,7 @@ def augment_category(src_dir, dst_dir, n_augmented, intensity, max_augs):
             n_augs = random.randint(1, max_augs)
             chosen = random.sample(MODES, n_augs)
             for mode in chosen:
-                aug_intensity = random.uniform(intensity * 0.5, intensity * 1.5)
+                aug_intensity = random.uniform(lighting_min, lighting_max)
                 augmented, _ = apply_lighting(augmented, mode=mode, intensity=aug_intensity)
             # Convert back to BGR for saving
             aug_bgr = cv2.cvtColor(augmented, cv2.COLOR_RGB2BGR)
@@ -72,7 +72,8 @@ def main():
     parser.add_argument('--data_dir', type=str, required=True, help='Path to dataset root (e.g., /workspace/mvtec)')
     parser.add_argument('--out_dir', type=str, required=True, help='Output directory for augmented dataset')
     parser.add_argument('--n_augmented', type=int, default=4, help='Number of augmented copies per image (default 4)')
-    parser.add_argument('--intensity', type=float, default=0.3, help='Base augmentation intensity (default 0.3)')
+    parser.add_argument('--lighting-min', type=float, default=0.02, help='Min lighting intensity (default 0.02)')
+    parser.add_argument('--lighting-max', type=float, default=0.12, help='Max lighting intensity (default 0.12)')
     parser.add_argument('--max_augs', type=int, default=2, help='Max augmentations to stack per image (default 2)')
     parser.add_argument('--item', type=str, default=None, help='Single category to process')
     parser.add_argument('--seed', type=int, default=42, help='Random seed (default 42)')
@@ -93,7 +94,8 @@ def main():
             os.path.join(args.data_dir, category),
             os.path.join(args.out_dir, category),
             args.n_augmented,
-            args.intensity,
+            args.lighting_min,
+            args.lighting_max,
             args.max_augs,
         )
         print(f"  {category}: {count} images saved")
