@@ -24,13 +24,30 @@ def main() -> None:
     parser.add_argument('--val_percentile', type=float, default=99.9)
     parser.add_argument('--combine_mode', type=str, default='average', choices=['average', 'boost'],
                         help='How to combine heatmaps: average or boost (CPR boosts INP)')
+    # INP-Former args
+    parser.add_argument('--inp_save_dir', type=str, default=None, help='INP-Former weights dir (default: {out_dir}/inp_former)')
+    parser.add_argument('--tiling', action='store_true', help='Use tiling for INP-Former')
+    parser.add_argument('--target_tile', type=int, default=1000, help='Target tile size')
+    parser.add_argument('--batch_size', type=int, default=16)
+    # CPR args
+    parser.add_argument('--cpr_save_dir', type=str, default=None, help='CPR output dir (default: {out_dir}/cpr)')
+    parser.add_argument('--cpr_checkpoints', type=str, default=None, help='CPR checkpoint pattern (e.g., log/mvtec_train_v2/{category}/03000.pth)')
+    # Validation dirs (override auto-detected paths)
+    parser.add_argument('--inp_val_dir', type=str, default=None, help='INP-Former validation heatmaps dir')
+    parser.add_argument('--cpr_val_dir', type=str, default=None, help='CPR validation heatmaps dir')
 
     args = parser.parse_args()
 
+    inp_save_dir = args.inp_save_dir or f'{args.out_dir}/inp_former'
+    cpr_save_dir = args.cpr_save_dir or f'{args.out_dir}/cpr'
+
+    # Heatmap output goes to out_dir regardless of where weights are
     inp_heatmap_dir = f'{args.out_dir}/inp_former/heatmaps'
     cpr_heatmap_dir = f'{args.out_dir}/cpr/heatmaps'
-    inp_val_dir = f'{args.out_dir}/inp_former/val_heatmaps'
-    cpr_val_dir = f'{args.out_dir}/cpr/val_heatmaps'
+
+    # Validation dirs: use explicit args, or look next to weights
+    inp_val_dir = args.inp_val_dir or f'{inp_save_dir}/INP-Former-Multi-Class_dataset=MVTec-AD_Encoder=dinov2reg_vit_base_14_Resize=448_Crop=392_INP_num=6/val_heatmaps'
+    cpr_val_dir = args.cpr_val_dir or f'{cpr_save_dir}/val_heatmaps'
 
     if args.model in ('inp', 'both'):
         print(f"\n{'='*20} INP-Former test {'='*20}")
@@ -39,24 +56,52 @@ def main() -> None:
             '--data_path', args.data_dir,
             '--phase', 'test',
             '--save_maps',
-            '--save_dir', f'{args.out_dir}/inp_former',
+            '--save_dir', inp_save_dir,
+            '--batch_size', str(args.batch_size),
         ]
+        if args.tiling:
+            inp_argv += ['--tiling', '--target_tile', str(args.target_tile)]
         if args.item:
             inp_argv += ['--item', args.item]
         inp_test_args = inp_parser.parse_args(inp_argv)
         inp_run(inp_test_args)
+
+        # Move heatmaps to out_dir if saved elsewhere
+        import shutil, os
+        src = os.path.join(inp_save_dir, 'INP-Former-Multi-Class_dataset=MVTec-AD_Encoder=dinov2reg_vit_base_14_Resize=448_Crop=392_INP_num=6', 'heatmaps')
+        if os.path.isdir(src) and src != inp_heatmap_dir:
+            os.makedirs(inp_heatmap_dir, exist_ok=True)
+            for cat in os.listdir(src):
+                dst_cat = os.path.join(inp_heatmap_dir, cat)
+                if os.path.exists(dst_cat):
+                    shutil.rmtree(dst_cat)
+                shutil.move(os.path.join(src, cat), dst_cat)
 
     if args.model in ('cpr', 'both'):
         print(f"\n{'='*20} CPR test {'='*20}")
         from industrial.cpr.runner import run_test as cpr_test, get_test_args_parser
         cpr_argv = [
             '--save-maps',
-            '--save-dir', f'{args.out_dir}/cpr',
+            '--save-dir', cpr_save_dir,
+            '--data-root', args.data_dir,
         ]
+        if args.cpr_checkpoints:
+            cpr_argv += ['--checkpoints', args.cpr_checkpoints]
         if args.item:
             cpr_argv += ['--sub-categories', args.item]
         cpr_test_args = get_test_args_parser().parse_args(cpr_argv)
         cpr_test(cpr_test_args)
+
+        # Move heatmaps to out_dir if saved elsewhere
+        import os
+        src = os.path.join(cpr_save_dir, 'heatmaps')
+        if os.path.isdir(src) and src != cpr_heatmap_dir:
+            os.makedirs(cpr_heatmap_dir, exist_ok=True)
+            for cat in os.listdir(src):
+                dst_cat = os.path.join(cpr_heatmap_dir, cat)
+                if os.path.exists(dst_cat):
+                    shutil.rmtree(dst_cat)
+                shutil.move(os.path.join(src, cat), dst_cat)
 
     # Run ensemble
     if args.model in ('both', 'ensemble_only'):
