@@ -176,36 +176,11 @@ def test(model: CPR, train_fns, test_fns, retrieval_result, foreground_result, r
                 amap = preds['p'][idx].cpu().numpy()
                 amap_norm = (amap - amap.min()) / (amap.max() - amap.min() + 1e-8)
 
-                amap_uint8 = (amap_norm * 255).astype(np.uint8)
-                _, binary_map = cv.threshold(amap_uint8, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-
                 input_img = cv.resize(cv.imread(image_fn), (resize, resize))
                 input_img = cv.cvtColor(input_img, cv.COLOR_BGR2RGB)
                 plt.imsave(os.path.join(out_dir, f'{image_name}_input.png'), input_img)
                 plt.imsave(os.path.join(out_dir, f'{image_name}_heatmap.png'), amap_norm, cmap='jet')
                 np.save(os.path.join(out_dir, f'{image_name}_heatmap_raw.npy'), amap)
-                plt.imsave(os.path.join(out_dir, f'{image_name}_binary.png'), binary_map, cmap='gray')
-
-                # Benjamini-Hochberg binary map
-                if null_mean is not None:
-                    amap_raw = preds['p'][idx].cpu().numpy()
-                    p_values = 1 - stats.norm.cdf(amap_raw, loc=null_mean, scale=null_std)
-                    p_flat = p_values.flatten()
-                    m = len(p_flat)
-                    sorted_idx = np.argsort(p_flat)
-                    sorted_p = p_flat[sorted_idx]
-                    bh_threshold = np.zeros(m)
-                    for rank in range(m):
-                        bh_threshold[rank] = (rank + 1) / m * bh_fdr
-                    rejected = sorted_p <= bh_threshold
-                    # find largest k where p_(k) <= threshold
-                    if rejected.any():
-                        max_rejected = np.where(rejected)[0][-1]
-                        rejected[:max_rejected + 1] = True
-                    bh_map = np.zeros(m, dtype=np.uint8)
-                    bh_map[sorted_idx[rejected]] = 255
-                    bh_map = bh_map.reshape(amap_raw.shape)
-                    plt.imsave(os.path.join(out_dir, f'{image_name}_binary_bh.png'), bh_map, cmap='gray')
 
                 amap_color = (plt.cm.jet(amap_norm)[:, :, :3] * 255).astype(np.uint8)
                 overlay = cv.addWeighted(input_img, 0.5, amap_color, 0.5, 0)

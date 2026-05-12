@@ -67,43 +67,9 @@ def save_heatmaps(model, dataloader, device, save_dir, item, crop_size, seg_head
                 overlay = cv2.addWeighted(input_img, 0.5, amap_color, 0.5, 0)
                 plt.imsave(os.path.join(out_dir, f'{fname}_overlay.png'), overlay)
 
-                # Binary mask
-                raw_amap = anomaly_map[i, 0].cpu().numpy()
-                if evt_params is not None:
-                    pred_mask = evt_threshold(raw_amap, evt_params, fdr=evt_fdr)
-                elif min_score is not None and raw_amap.max() < min_score:
-                    pred_mask = np.zeros_like(amap, dtype=np.uint8)
-                elif top_percent is not None:
-                    threshold = np.percentile(amap, 100 - top_percent)
-                    pred_mask = ((amap >= threshold) * 255).astype(np.uint8)
-                else:
-                    amap_uint8 = (amap * 255).astype(np.uint8)
-                    _, pred_mask = cv2.threshold(amap_uint8, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                plt.imsave(os.path.join(out_dir, f'{fname}_binary.png'), pred_mask, cmap='gray')
-
-                # Seg head binary mask (threshold at 0.5)
-                if seg_pred is not None:
-                    seg_map = seg_pred[i, 0].cpu().numpy()
-                    binary_seg = ((seg_map >= 0.5) * 255).astype(np.uint8)
-                    plt.imsave(os.path.join(out_dir, f'{fname}_binary_seg.png'), binary_seg, cmap='gray')
-                    plt.imsave(os.path.join(out_dir, f'{fname}_seg_heatmap.png'), seg_map, cmap='jet')
-
                 if label[i] == 1:
                     gt_map = gt[i, 0].cpu().numpy()
                     plt.imsave(os.path.join(out_dir, f'{fname}_gt.png'), gt_map, cmap='gray')
-
-                    # Comparison overlay: green=TP, red=FN, blue=FP
-                    gt_binary = (gt_map > 0.5).astype(np.uint8)
-                    pred_binary = (pred_mask > 127).astype(np.uint8)
-                    h, w = gt_binary.shape
-                    comp = input_img.copy()
-                    tp = (gt_binary == 1) & (pred_binary == 1)
-                    fn = (gt_binary == 1) & (pred_binary == 0)
-                    fp = (gt_binary == 0) & (pred_binary == 1)
-                    comp[tp] = (comp[tp] * 0.5 + np.array([0, 255, 0]) * 0.5).astype(np.uint8)   # green = correct detection
-                    comp[fn] = (comp[fn] * 0.5 + np.array([255, 0, 0]) * 0.5).astype(np.uint8)   # red = missed anomaly
-                    comp[fp] = (comp[fp] * 0.5 + np.array([0, 0, 255]) * 0.5).astype(np.uint8)   # blue = false alarm
-                    plt.imsave(os.path.join(out_dir, f'{fname}_comparison.png'), comp)
                 plt.close('all')
 
 
@@ -158,21 +124,6 @@ def save_heatmaps_tiled(model, dataloader, device, save_dir, item, crop_size, to
         # Save heatmap
         plt.imsave(os.path.join(out_dir, f'{fname}_heatmap.png'), amap_save, cmap='jet')
         np.save(os.path.join(out_dir, f'{fname}_heatmap_raw.npy'), amap)
-
-        # Binary mask (compute on full-res, then resize)
-        amap_norm = (amap - amap.min()) / (amap.max() - amap.min() + 1e-8)
-        if evt_params is not None:
-            pred_mask = evt_threshold(amap, evt_params, fdr=evt_fdr)
-        elif min_score is not None and amap.max() < min_score:
-            pred_mask = np.zeros_like(amap_norm, dtype=np.uint8)
-        elif top_percent is not None:
-            threshold = np.percentile(amap_norm, 100 - top_percent)
-            pred_mask = ((amap_norm >= threshold) * 255).astype(np.uint8)
-        else:
-            amap_uint8 = (amap_norm * 255).astype(np.uint8)
-            _, pred_mask = cv2.threshold(amap_uint8, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        pred_mask_save = cv2.resize(pred_mask, (save_size, save_size), interpolation=cv2.INTER_NEAREST)
-        plt.imsave(os.path.join(out_dir, f'{fname}_binary.png'), pred_mask_save, cmap='gray')
 
         if data['label'] == 1:
             # Load original GT — check AD 2 layout then AD 1
