@@ -447,6 +447,8 @@ def validate_one_category(args, item, data_transform, device, use_tiling, tile_o
                     info['margin_x'], info['margin_y']
                 )
 
+                # Downsize to 512 and save as float16 to save disk space
+                stitched = cv2.resize(stitched, (512, 512)).astype(np.float16)
                 fname = os.path.splitext(os.path.basename(img_path))[0]
                 np.save(os.path.join(out_dir, f'{fname}_heatmap_raw.npy'), stitched)
                 total_saved += 1
@@ -468,6 +470,7 @@ def validate_one_category(args, item, data_transform, device, use_tiling, tile_o
                     fpath = val_data.samples[sample_idx][0]
                     fname = os.path.splitext(os.path.basename(fpath))[0]
                     raw_amap = anomaly_map[i, 0].cpu().numpy()
+                    raw_amap = cv2.resize(raw_amap, (512, 512)).astype(np.float16)
                     np.save(os.path.join(out_dir, f'{fname}_heatmap_raw.npy'), raw_amap)
                     sample_idx += 1
                     total_saved += 1

@@ -284,6 +284,7 @@ def validate(model, train_fns, val_fns, retrieval_result, foreground_result, res
         score_g = gaussian_blur(score[None], (33, 33), 4)[0]
 
         amap = score_g.cpu().numpy()
+        amap = cv.resize(amap, (512, 512)).astype(np.float16)
         np.save(os.path.join(out_dir, f'{image_name}_heatmap_raw.npy'), amap)
         n_saved += 1
 
