@@ -22,6 +22,8 @@ def main() -> None:
     parser.add_argument('--threshold_method', type=str, default='evt', choices=['evt', 'val_max', 'otsu'])
     parser.add_argument('--evt_fdr', type=float, default=0.01)
     parser.add_argument('--val_percentile', type=float, default=99.9)
+    parser.add_argument('--combine_mode', type=str, default='average', choices=['average', 'boost'],
+                        help='How to combine heatmaps: average or boost (CPR boosts INP)')
 
     args = parser.parse_args()
 
@@ -79,6 +81,7 @@ def main() -> None:
         ens.threshold_method = args.threshold_method
         ens.evt_fdr = args.evt_fdr
         ens.val_percentile = args.val_percentile
+        ens.combine_mode = args.combine_mode
 
         run_ensemble(ens)
 

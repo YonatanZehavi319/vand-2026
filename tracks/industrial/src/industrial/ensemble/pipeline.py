@@ -33,6 +33,7 @@ def run_ensemble(args):
         categories = [c for c in categories if c == args.item]
 
     save_size = args.save_size
+    combine_mode = getattr(args, 'combine_mode', 'average')
 
     # Compute global stats and fit threshold from validation
     global_stats = None
@@ -49,7 +50,7 @@ def run_ensemble(args):
             for category in categories:
                 params = fit_evt_from_validation(
                     args.inp_val_dir, args.cpr_val_dir, category,
-                    save_size, args.inp_weight, args.cpr_weight, global_stats=global_stats)
+                    save_size, args.inp_weight, args.cpr_weight, global_stats=global_stats, combine_mode=combine_mode)
                 if params is not None:
                     evt_params_per_cat[category] = params
             thresholds_per_cat = {'method': 'evt', 'params': evt_params_per_cat, 'fdr': args.evt_fdr}
@@ -61,7 +62,7 @@ def run_ensemble(args):
                 val_max = compute_val_max(
                     args.inp_val_dir, args.cpr_val_dir, category,
                     save_size, args.inp_weight, args.cpr_weight,
-                    global_stats=global_stats, percentile=args.val_percentile)
+                    global_stats=global_stats, percentile=args.val_percentile, combine_mode=combine_mode)
                 if val_max is not None:
                     val_maxes[category] = val_max
             thresholds_per_cat = {'method': 'val_max', 'thresholds': val_maxes}
@@ -97,7 +98,7 @@ def run_ensemble(args):
 
                 combined, was_combined = combine_heatmaps(
                     inp_sub, cpr_sub, fname, save_size, args.inp_weight, args.cpr_weight,
-                    global_stats=global_stats)
+                    global_stats=global_stats, combine_mode=combine_mode)
                 if combined is None:
                     continue
                 if was_combined:
@@ -179,6 +180,8 @@ def main():
     parser.add_argument('--threshold_method', type=str, default='evt', choices=['evt', 'val_max', 'otsu'])
     parser.add_argument('--evt_fdr', type=float, default=0.01)
     parser.add_argument('--val_percentile', type=float, default=99.9, help='Percentile for val_max threshold')
+    parser.add_argument('--combine_mode', type=str, default='average', choices=['average', 'boost'],
+                        help='How to combine heatmaps: average (weighted avg) or boost (CPR boosts INP)')
 
     args = parser.parse_args()
     run_ensemble(args)
