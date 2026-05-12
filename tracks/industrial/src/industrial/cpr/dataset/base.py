@@ -38,7 +38,7 @@ class RandomLightingAugmentation:
 
 
 class CPRDataset(Dataset):
-    def __init__(self, dataset_name: str, sub_category: str, resize: int, data_dir: str, scales: List[int], region_sizes: List[int], retrieval_dir: str, foreground_dir: str = None, nAnomaly: int = 0, knn: int = 10, data_root: str = None) -> None:
+    def __init__(self, dataset_name: str, sub_category: str, resize: int, data_dir: str, scales: List[int], region_sizes: List[int], retrieval_dir: str, foreground_dir: str = None, nAnomaly: int = 0, knn: int = 10, data_root: str = None, lighting_prob: float = 0.5, lighting_intensity: tuple = (0.08, 0.2), lighting_max_augs: int = 2) -> None:
         self.dataset_name             = dataset_name
         self.sub_category             = sub_category
         self.is_object                = sub_category in DATASET_INFOS[self.dataset_name][1]
@@ -131,7 +131,7 @@ class CPRDataset(Dataset):
         
         self.aug_transform = T.Compose([
             T.RandomApply([RandomSPNoise(0.97)], .3),
-            RandomLightingAugmentation(p=0.5, intensity_range=(0.08, 0.2), max_augs=2),
+            RandomLightingAugmentation(p=lighting_prob, intensity_range=lighting_intensity, max_augs=lighting_max_augs),
         ])
         self.transform = test_transform
         

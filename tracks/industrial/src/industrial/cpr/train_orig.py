@@ -45,6 +45,11 @@ def get_args_parser():
     parser.add_argument("--T", type=int, default=512)  # for image-level inference, DeSTSeg
     # model
     parser.add_argument("-pm", "--pretrained-model", type=str, default='DenseNet', choices=list(MODEL_INFOS.keys()), help="pretrained model")
+    # lighting augmentation
+    parser.add_argument("--lighting-prob", type=float, default=0.5, help="Probability of lighting augmentation (default 0.5)")
+    parser.add_argument("--lighting-min", type=float, default=0.08, help="Min lighting intensity (default 0.08)")
+    parser.add_argument("--lighting-max", type=float, default=0.2, help="Max lighting intensity (default 0.2)")
+    parser.add_argument("--lighting-max-augs", type=int, default=2, help="Max augmentations to stack (default 2)")
     return parser
 
 class ContrastiveLoss(nn.Module):
@@ -110,7 +115,7 @@ def main(args):
         seed_worker       = fix_seeds(66)
         model             = create_model(args.pretrained_model, layers).cuda().train()
         _data_root = getattr(args, 'data_root', None) or os.path.join('./data', args.dataset_name)
-        dataset           = CPRDataset(args.dataset_name, sub_category, args.resize, args.data_dir, args.scales, args.region_sizes, args.retrieval_dir, args.foreground_dir, data_root=_data_root)
+        dataset           = CPRDataset(args.dataset_name, sub_category, args.resize, args.data_dir, args.scales, args.region_sizes, args.retrieval_dir, args.foreground_dir, data_root=_data_root, lighting_prob=args.lighting_prob, lighting_intensity=(args.lighting_min, args.lighting_max), lighting_max_augs=args.lighting_max_augs)
         writer            = SummaryWriter(os.path.join(args.log_path, sub_category), flush_secs=10)
         dataloader        = DataLoader(dataset, batch_size=args.batch_size, sampler=InfiniteSampler(dataset), num_workers=args.num_workers, pin_memory=True, worker_init_fn=seed_worker)
         optimizer         = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=1e-2)
