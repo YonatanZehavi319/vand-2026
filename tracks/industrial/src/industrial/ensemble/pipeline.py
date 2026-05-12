@@ -21,6 +21,7 @@ from industrial.ensemble.combine import (
     compute_global_stats,
     fit_evt_from_validation,
     evt_threshold,
+    post_process_heatmap,
     absolute_threshold,
     compute_val_max,
 )
@@ -34,6 +35,22 @@ def run_ensemble(args):
 
     save_size = args.save_size
     combine_mode = getattr(args, 'combine_mode', 'average')
+    median_sub = getattr(args, 'median_sub', False)
+
+    # Build post-processing args dict (shared between validation and test)
+    pp_args = {
+        'bilateral': getattr(args, 'bilateral', False),
+        'bilateral_d': getattr(args, 'bilateral_d', 9),
+        'bilateral_sc': getattr(args, 'bilateral_sc', 75),
+        'bilateral_ss': getattr(args, 'bilateral_ss', 75),
+        'guided': getattr(args, 'guided', False),
+        'guided_r': getattr(args, 'guided_r', 8),
+        'guided_eps': getattr(args, 'guided_eps', 0.01),
+        'median_sub': median_sub,
+    }
+
+    # Where to find original validation images for guided filtering
+    val_image_dir = getattr(args, 'val_image_dir', None)
 
     # Compute global stats and fit threshold from validation
     global_stats = None
@@ -50,7 +67,8 @@ def run_ensemble(args):
             for category in categories:
                 params = fit_evt_from_validation(
                     args.inp_val_dir, args.cpr_val_dir, category,
-                    save_size, args.inp_weight, args.cpr_weight, global_stats=global_stats, combine_mode=combine_mode)
+                    save_size, args.inp_weight, args.cpr_weight, global_stats=global_stats,
+                    combine_mode=combine_mode, post_process_args=pp_args, val_image_dir=val_image_dir)
                 if params is not None:
                     evt_params_per_cat[category] = params
             # Compute per-category FDR
@@ -80,7 +98,8 @@ def run_ensemble(args):
                 val_max = compute_val_max(
                     args.inp_val_dir, args.cpr_val_dir, category,
                     save_size, args.inp_weight, args.cpr_weight,
-                    global_stats=global_stats, percentile=args.val_percentile, combine_mode=combine_mode)
+                    global_stats=global_stats, percentile=args.val_percentile,
+                    combine_mode=combine_mode, post_process_args=pp_args, val_image_dir=val_image_dir)
                 if val_max is not None:
                     val_maxes[category] = val_max
             thresholds_per_cat = {'method': 'val_max', 'thresholds': val_maxes}
@@ -122,33 +141,19 @@ def run_ensemble(args):
                 if was_combined:
                     n_combined += 1
 
-                # Apply smoothing
-                bilateral = getattr(args, 'bilateral', False)
-                guided = getattr(args, 'guided', False)
-                if bilateral or guided:
-                    # Load original image as guide
-                    guide = None
+                # Apply post-processing (same pipeline as validation)
+                guide_img = None
+                if pp_args.get('guided') and args.data_dir:
                     for split_name in ['test_public', 'test']:
                         for ext in ['.png', '.JPG', '.bmp']:
                             p = os.path.join(args.data_dir, category, split_name, sub_dir, fname + ext)
                             if os.path.exists(p):
-                                guide = cv2.imread(p)
-                                guide = cv2.resize(guide, (save_size, save_size))
+                                guide_img = cv2.imread(p)
+                                guide_img = cv2.resize(guide_img, (save_size, save_size))
                                 break
-                        if guide is not None:
+                        if guide_img is not None:
                             break
-
-                    if bilateral:
-                        combined = cv2.bilateralFilter(combined.astype(np.float32),
-                                                       d=args.bilateral_d,
-                                                       sigmaColor=args.bilateral_sc,
-                                                       sigmaSpace=args.bilateral_ss)
-
-                    if guided and guide is not None:
-                        guide_gray = cv2.cvtColor(guide, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
-                        combined = cv2.ximgproc.guidedFilter(guide_gray, combined.astype(np.float32),
-                                                             radius=args.guided_r,
-                                                             eps=args.guided_eps)
+                combined = post_process_heatmap(combined, guide_img=guide_img, **pp_args)
 
                 # Save heatmap visualization
                 plt.imsave(os.path.join(heatmap_out, f'{fname}_heatmap.png'), combined, cmap='jet')
@@ -240,6 +245,9 @@ def main():
     # Adaptive FDR
     parser.add_argument('--adaptive_fdr', action='store_true', help='Scale FDR per category based on GEV shape')
     parser.add_argument('--adaptive_strength', type=float, default=0.3, help='Blend: 0=uniform, 1=full adaptive (default 0.3)')
+    # Per-image normalization
+    parser.add_argument('--median_sub', action='store_true', help='Subtract per-image median before thresholding')
+    parser.add_argument('--val_image_dir', type=str, default=None, help='Validation images dir (for guided filter during EVT fitting)')
 
     args = parser.parse_args()
     run_ensemble(args)

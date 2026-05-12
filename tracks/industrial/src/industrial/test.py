@@ -46,6 +46,9 @@ def main() -> None:
     # Adaptive FDR
     parser.add_argument('--adaptive_fdr', action='store_true')
     parser.add_argument('--adaptive_strength', type=float, default=0.3)
+    # Per-image normalization
+    parser.add_argument('--median_sub', action='store_true', help='Subtract per-image median')
+    parser.add_argument('--val_image_dir', type=str, default=None, help='Validation images dir (for guided filter during EVT fitting)')
 
     args = parser.parse_args()
 
@@ -147,6 +150,8 @@ def main() -> None:
         ens.guided_eps = args.guided_eps
         ens.adaptive_fdr = args.adaptive_fdr
         ens.adaptive_strength = args.adaptive_strength
+        ens.median_sub = args.median_sub
+        ens.val_image_dir = args.val_image_dir
 
         run_ensemble(ens)
 

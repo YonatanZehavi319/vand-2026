@@ -115,7 +115,32 @@ def compute_global_stats(inp_val_dir, cpr_val_dir, categories, save_size, mode='
     return stats
 
 
-def fit_evt_from_validation(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, cpr_weight, global_stats=None, combine_mode='average'):
+def post_process_heatmap(combined, guide_img=None, bilateral=False, bilateral_d=9, bilateral_sc=75, bilateral_ss=75,
+                         guided=False, guided_r=8, guided_eps=0.01, median_sub=False):
+    """Apply post-processing to a combined heatmap. Same pipeline for validation and test."""
+    if bilateral:
+        combined = cv2.bilateralFilter(combined.astype(np.float32), d=bilateral_d,
+                                        sigmaColor=bilateral_sc, sigmaSpace=bilateral_ss)
+    if guided and guide_img is not None:
+        guide_gray = cv2.cvtColor(guide_img, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+        combined = cv2.ximgproc.guidedFilter(guide_gray, combined.astype(np.float32),
+                                              radius=guided_r, eps=guided_eps)
+    if median_sub:
+        combined = combined - np.median(combined)
+    return combined
+
+
+def _find_val_image(val_dir, category, fname):
+    """Find the original validation image for guided filtering."""
+    for ext in ['.png', '.JPG', '.bmp']:
+        p = os.path.join(val_dir, category, 'validation', 'good', fname + ext)
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def fit_evt_from_validation(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, cpr_weight,
+                            global_stats=None, combine_mode='average', post_process_args=None, val_image_dir=None):
     """Fit GEV distribution on combined validation/good heatmaps for a category."""
     inp_val_good = os.path.join(inp_val_dir, category, 'good')
     cpr_val_good = os.path.join(cpr_val_dir, category, 'good')
@@ -125,12 +150,21 @@ def fit_evt_from_validation(inp_val_dir, cpr_val_dir, category, save_size, inp_w
         return None
 
     inp_npy_files = sorted(glob(os.path.join(inp_val_good, '*_heatmap_raw.npy')))
+    pp = post_process_args or {}
 
     all_pixel_scores = []
     for npy_path in inp_npy_files:
         fname = os.path.basename(npy_path).replace('_heatmap_raw.npy', '')
         combined, _ = combine_heatmaps(inp_val_good, cpr_val_good, fname, save_size, inp_weight, cpr_weight, global_stats=global_stats, combine_mode=combine_mode)
         if combined is not None:
+            # Apply same post-processing as test
+            guide_img = None
+            if pp.get('guided') and val_image_dir:
+                img_path = _find_val_image(val_image_dir, category, fname)
+                if img_path is not None:
+                    guide_img = cv2.imread(img_path)
+                    guide_img = cv2.resize(guide_img, (save_size, save_size))
+            combined = post_process_heatmap(combined, guide_img=guide_img, **pp)
             all_pixel_scores.append(combined.flatten())
 
     if not all_pixel_scores:
@@ -159,18 +193,27 @@ def absolute_threshold(combined_map, val_max):
     return ((combined_map > val_max) * 255).astype(np.uint8)
 
 
-def compute_val_max(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, cpr_weight, global_stats=None, percentile=99.9, combine_mode='average'):
+def compute_val_max(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, cpr_weight,
+                    global_stats=None, percentile=99.9, combine_mode='average', post_process_args=None, val_image_dir=None):
     """Compute the near-max of validation combined scores for a category."""
     inp_val_good = os.path.join(inp_val_dir, category, 'good')
     cpr_val_good = os.path.join(cpr_val_dir, category, 'good')
 
     inp_npy_files = sorted(glob(os.path.join(inp_val_good, '*_heatmap_raw.npy')))
+    pp = post_process_args or {}
 
     all_pixel_scores = []
     for npy_path in inp_npy_files:
         fname = os.path.basename(npy_path).replace('_heatmap_raw.npy', '')
         combined, _ = combine_heatmaps(inp_val_good, cpr_val_good, fname, save_size, inp_weight, cpr_weight, global_stats=global_stats, combine_mode=combine_mode)
         if combined is not None:
+            guide_img = None
+            if pp.get('guided') and val_image_dir:
+                img_path = _find_val_image(val_image_dir, category, fname)
+                if img_path is not None:
+                    guide_img = cv2.imread(img_path)
+                    guide_img = cv2.resize(guide_img, (save_size, save_size))
+            combined = post_process_heatmap(combined, guide_img=guide_img, **pp)
             all_pixel_scores.append(combined.flatten())
 
     if not all_pixel_scores:
