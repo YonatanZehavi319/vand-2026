@@ -30,7 +30,7 @@ perlin_scale           = 6
 min_perlin_scale       = 0
 structure_grid_size    = 16
 save_format            = 'jpg'
-DTD_DIR                = './data/dtd/images'  # overridden by --dtd-dir
+DTD_DIR_DEFAULT        = './data/dtd/images'
 
 def generate_perlin_noise_mask(resize) -> np.ndarray:
     # define perlin noise scale
@@ -89,7 +89,7 @@ def structure_source_img(img: np.ndarray) -> np.ndarray:
     ).astype(np.float32)
     return structure_source_img
 
-def generate_synthetic_anomaly_img(img, is_object, foreground_weight):
+def generate_synthetic_anomaly_img(img, is_object, foreground_weight, dtd_dir='./data/dtd/images'):
     resize = img.shape[0]
     while True:
         anomaly_img_mask = generate_perlin_noise_mask(resize)
@@ -106,7 +106,7 @@ def generate_synthetic_anomaly_img(img, is_object, foreground_weight):
     # step 2. generate texture or structure anomaly
     ## anomaly source
     if np.random.uniform() < 0.5 or not is_object:
-        anomaly_source_img = read_image(random.choice(sorted(glob(os.path.join(DTD_DIR, '*/*')))), (resize, resize)).astype(np.float32)
+        anomaly_source_img = read_image(random.choice(sorted(glob(os.path.join(dtd_dir, '*/*')))), (resize, resize)).astype(np.float32)
     else:
         anomaly_source_img = structure_source_img(img)
     ## mask anomaly parts
@@ -116,7 +116,7 @@ def generate_synthetic_anomaly_img(img, is_object, foreground_weight):
     anomaly_source_img = ((- mask_expanded + 1) * img) + anomaly_source_img
     return anomaly_source_img.astype(np.uint8), (anomaly_img_mask * 255).astype(np.uint8)
 
-def generate_one(uid, save_path, info, resize, is_object, foreground_fn: str = None):
+def generate_one(uid, save_path, info, resize, is_object, foreground_fn: str = None, dtd_dir='./data/dtd/images'):
     fix_seeds(uid)  # reproduce
     image_fn, k = info
     assert os.path.join(image_fn), f'{image_fn} not exists'
@@ -128,7 +128,7 @@ def generate_one(uid, save_path, info, resize, is_object, foreground_fn: str = N
     else:
         foreground_weight = np.ones((resize, resize))
     if random.random() < anomaly_ratio:
-        anomaly_source_img, anomaly_img_mask = generate_synthetic_anomaly_img(img, is_object, foreground_weight)
+        anomaly_source_img, anomaly_img_mask = generate_synthetic_anomaly_img(img, is_object, foreground_weight, dtd_dir=dtd_dir)
     cv.imwrite(os.path.join(save_path, f'{uid}.{save_format}'), cv.cvtColor(anomaly_source_img, cv.COLOR_RGB2BGR))
     cv.imwrite(os.path.join(save_path, f'{uid}_mask.{save_format}'), anomaly_img_mask)
     return uid, k
@@ -153,6 +153,7 @@ def generate(num_workers, save_path, dataset_name, resize, num, foreground_dir: 
                (resize for _ in range(num)),
                (is_object for _ in range(num)),
                (foreground_dir and os.path.join(foreground_dir, sub_category, os.path.dirname(info[1]), 'f_' + os.path.basename(info[1]).split('.')[0] + '.npy') for info, _ in zip(cycle(train_infos), range(num))),
+               (dtd_dir for _ in range(num)),
             ]
             for (uid, k) in tqdm(executor.map(generate_one, *params), total=num, desc=f'{sub_category} generate', leave=False):
                 f.write(f'{uid}.{save_format} {k}\n')
@@ -176,6 +177,4 @@ if __name__ == "__main__":
     logger.info('args: \n' + pformat(vars(args)))
     save_dependencies_files(os.path.join(args.log_path, 'src'))
     data_root = args.data_root or os.path.join('./data', args.dataset_name)
-    import industrial.cpr.tools.generate_synthetic_data as _self
-    _self.DTD_DIR = args.dtd_dir
-    generate(args.num_workers, args.log_path, args.dataset_name, args.resize, args.num, args.foreground_dir, data_root=data_root)
+    generate(args.num_workers, args.log_path, args.dataset_name, args.resize, args.num, args.foreground_dir, data_root=data_root, dtd_dir=args.dtd_dir)
