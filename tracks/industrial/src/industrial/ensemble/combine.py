@@ -25,7 +25,7 @@ def load_heatmap(path):
 def load_heatmap_npy(path):
     """Load raw heatmap from .npy file if available."""
     if os.path.exists(path):
-        return np.load(path)
+        return np.load(path).astype(np.float32)
     return None
 
 
@@ -87,17 +87,17 @@ def compute_global_stats(inp_val_dir, cpr_val_dir, categories, save_size, mode='
         cpr_good = os.path.join(cpr_val_dir, category, 'good')
 
         for npy_path in sorted(glob(os.path.join(inp_good, '*_heatmap_raw.npy'))):
-            amap = np.load(npy_path)
+            amap = np.load(npy_path).astype(np.float32)
             amap = cv2.resize(amap, (save_size, save_size))
             inp_pixels.append(amap.flatten())
 
         for npy_path in sorted(glob(os.path.join(cpr_good, '*_heatmap_raw.npy'))):
-            amap = np.load(npy_path)
+            amap = np.load(npy_path).astype(np.float32)
             amap = cv2.resize(amap, (save_size, save_size))
             cpr_pixels.append(amap.flatten())
 
-    inp_all = np.concatenate(inp_pixels)
-    cpr_all = np.concatenate(cpr_pixels)
+    inp_all = np.concatenate(inp_pixels).astype(np.float32)
+    cpr_all = np.concatenate(cpr_pixels).astype(np.float32)
 
     if mode == 'zscore':
         stats = {
