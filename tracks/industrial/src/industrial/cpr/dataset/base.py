@@ -15,6 +15,26 @@ import torchvision.transforms as T
 
 from industrial.cpr.dataset import test_transform, DATASET_INFOS, read_image, read_mask
 from industrial.cpr.dataset.transforms import RandomSPNoise, RandomLightness
+from industrial.shared.synth_lighting import apply_lighting, MODES
+
+
+class RandomLightingAugmentation:
+    """Applies 1-2 random lighting augmentations from synth_lighting.
+    Works on numpy uint8 RGB arrays (matches CPR's image format)."""
+    def __init__(self, p=0.5, intensity_range=(0.08, 0.2), max_augs=2):
+        self.p = p
+        self.intensity_range = intensity_range
+        self.max_augs = max_augs
+
+    def __call__(self, img):
+        if random.random() > self.p:
+            return img
+        n_augs = random.randint(1, self.max_augs)
+        chosen = random.sample(MODES, n_augs)
+        for mode in chosen:
+            intensity = random.uniform(*self.intensity_range)
+            img, _ = apply_lighting(img, mode=mode, intensity=intensity)
+        return img
 
 
 class CPRDataset(Dataset):
@@ -111,7 +131,7 @@ class CPRDataset(Dataset):
         
         self.aug_transform = T.Compose([
             T.RandomApply([RandomSPNoise(0.97)], .3),
-            T.RandomApply([RandomLightness(0.1)], .3),
+            RandomLightingAugmentation(p=0.5, intensity_range=(0.08, 0.2), max_augs=2),
         ])
         self.transform = test_transform
         
