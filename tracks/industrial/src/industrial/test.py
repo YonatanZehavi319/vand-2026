@@ -35,6 +35,17 @@ def main() -> None:
     # Validation dirs (override auto-detected paths)
     parser.add_argument('--inp_val_dir', type=str, default=None, help='INP-Former validation heatmaps dir')
     parser.add_argument('--cpr_val_dir', type=str, default=None, help='CPR validation heatmaps dir')
+    # Smoothing options
+    parser.add_argument('--bilateral', action='store_true', help='Apply bilateral filter')
+    parser.add_argument('--bilateral_d', type=int, default=9)
+    parser.add_argument('--bilateral_sc', type=float, default=75)
+    parser.add_argument('--bilateral_ss', type=float, default=75)
+    parser.add_argument('--guided', action='store_true', help='Apply guided filter')
+    parser.add_argument('--guided_r', type=int, default=8)
+    parser.add_argument('--guided_eps', type=float, default=0.01)
+    # Adaptive FDR
+    parser.add_argument('--adaptive_fdr', action='store_true')
+    parser.add_argument('--adaptive_strength', type=float, default=0.3)
 
     args = parser.parse_args()
 
@@ -127,6 +138,15 @@ def main() -> None:
         ens.evt_fdr = args.evt_fdr
         ens.val_percentile = args.val_percentile
         ens.combine_mode = args.combine_mode
+        ens.bilateral = args.bilateral
+        ens.bilateral_d = args.bilateral_d
+        ens.bilateral_sc = args.bilateral_sc
+        ens.bilateral_ss = args.bilateral_ss
+        ens.guided = args.guided
+        ens.guided_r = args.guided_r
+        ens.guided_eps = args.guided_eps
+        ens.adaptive_fdr = args.adaptive_fdr
+        ens.adaptive_strength = args.adaptive_strength
 
         run_ensemble(ens)
 
