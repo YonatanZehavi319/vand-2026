@@ -391,6 +391,7 @@ def validate_one_category(args, item, data_transform, device, use_tiling, tile_o
     """Run model on validation/good images and save heatmaps only (no metrics).
     Uses --val_dir if provided, otherwise reads from {data_path}/{item}/validation/."""
     from industrial.inp_former.utils import cal_anomaly_maps, get_gaussian_kernel
+    import ast
 
     model, embed_dim, *_ = build_model(args, device)
     cat_save_dir = os.path.join(args.save_dir, args.save_name, item)
@@ -413,26 +414,63 @@ def validate_one_category(args, item, data_transform, device, use_tiling, tile_o
     os.makedirs(out_dir, exist_ok=True)
 
     val_folder = os.path.dirname(val_path)  # .../validation/
-    val_data = ImageFolder(root=val_folder, transform=data_transform)
-    val_dataloader = torch.utils.data.DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
-    total_saved = 0
-    sample_idx = 0
-    with torch.no_grad():
-        for imgs, _ in tqdm(val_dataloader, desc=f'Validation maps: {item}', ncols=80):
-            imgs = imgs.to(device)
-            output = model(imgs)
-            en, de = output[0], output[1]
-            anomaly_map, _ = cal_anomaly_maps(en, de, args.crop_size)
-            anomaly_map = gaussian_kernel(anomaly_map)
+    if use_tiling:
+        from PIL import Image as PILImage
+        from industrial.inp_former.dataset import extract_tiles
+        import glob as glob_mod
+        image_paths = sorted(
+            p for ext in ('*.png', '*.JPG', '*.bmp')
+            for p in glob_mod.glob(os.path.join(val_path, ext))
+        )
 
-            for i in range(imgs.shape[0]):
-                fpath = val_data.samples[sample_idx][0]
-                fname = os.path.splitext(os.path.basename(fpath))[0]
-                raw_amap = anomaly_map[i, 0].cpu().numpy()
-                np.save(os.path.join(out_dir, f'{fname}_heatmap_raw.npy'), raw_amap)
-                sample_idx += 1
+        total_saved = 0
+        with torch.no_grad():
+            for img_path in tqdm(image_paths, desc=f'Validation tiled: {item}', ncols=80):
+                img = PILImage.open(img_path).convert('RGB')
+                tiles, info = extract_tiles(img, tile_overlap, target_tile=args.target_tile)
+
+                tile_maps = []
+                for batch_start in range(0, len(tiles), args.batch_size):
+                    batch_tiles = tiles[batch_start:batch_start + args.batch_size]
+                    batch_tensor = torch.stack([data_transform(t) for t in batch_tiles]).to(device)
+                    output = model(batch_tensor)
+                    en, de = output[0], output[1]
+                    amap, _ = cal_anomaly_maps(en, de, batch_tensor.shape[-1])
+                    amap = gaussian_kernel(amap)
+                    for j in range(amap.shape[0]):
+                        tile_maps.append(amap[j, 0].cpu().numpy())
+
+                stitched = stitch_tiles(
+                    tile_maps, info['h'], info['w'],
+                    info['tile_h'], info['tile_w'], info['positions'],
+                    info['margin_x'], info['margin_y']
+                )
+
+                fname = os.path.splitext(os.path.basename(img_path))[0]
+                np.save(os.path.join(out_dir, f'{fname}_heatmap_raw.npy'), stitched)
                 total_saved += 1
+    else:
+        val_data = ImageFolder(root=val_folder, transform=data_transform)
+        val_dataloader = torch.utils.data.DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
+
+        total_saved = 0
+        sample_idx = 0
+        with torch.no_grad():
+            for imgs, _ in tqdm(val_dataloader, desc=f'Validation maps: {item}', ncols=80):
+                imgs = imgs.to(device)
+                output = model(imgs)
+                en, de = output[0], output[1]
+                anomaly_map, _ = cal_anomaly_maps(en, de, args.crop_size)
+                anomaly_map = gaussian_kernel(anomaly_map)
+
+                for i in range(imgs.shape[0]):
+                    fpath = val_data.samples[sample_idx][0]
+                    fname = os.path.splitext(os.path.basename(fpath))[0]
+                    raw_amap = anomaly_map[i, 0].cpu().numpy()
+                    np.save(os.path.join(out_dir, f'{fname}_heatmap_raw.npy'), raw_amap)
+                    sample_idx += 1
+                    total_saved += 1
 
     print_fn(f'{item}: {total_saved} validation heatmaps saved to {out_dir}')
 
