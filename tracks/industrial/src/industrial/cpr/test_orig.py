@@ -41,6 +41,7 @@ def get_args_parser():
     parser.add_argument("--bh-fdr", type=float, default=None, help="FDR rate for Benjamini-Hochberg thresholding (e.g. 0.05)")
     parser.add_argument("--validation", action="store_true", help="Run on validation/good images and save heatmaps for EVT fitting")
     parser.add_argument("--data-root", type=str, default=None, help="dataset root dir (default: ./data/{dataset_name})")
+    parser.add_argument("--val-dir", type=str, default=None, help="Override validation image directory (e.g., augmented val set)")
     return parser
 
 @torch.no_grad()
@@ -310,7 +311,12 @@ def main(args):
             retrieval_result = json.load(f)
 
         if args.validation:
-            val_fns = sorted(glob(os.path.join(root_dir, 'validation/good/*')))
+            val_root = getattr(args, 'val_dir', None)
+            if val_root:
+                val_good = os.path.join(val_root, sub_category, 'validation', 'good')
+            else:
+                val_good = os.path.join(root_dir, 'validation', 'good')
+            val_fns = sorted(glob(os.path.join(val_good, '*')))
             if not val_fns:
                 print(f'  {sub_category}: no validation images found, skipping')
                 continue

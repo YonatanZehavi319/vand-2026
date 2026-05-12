@@ -389,8 +389,7 @@ def test_one_category(args, item, data_transform, gt_transform, device, use_tili
 
 def validate_one_category(args, item, data_transform, device, use_tiling, tile_overlap):
     """Run model on validation/good images and save heatmaps only (no metrics).
-    When lighting_aug is enabled, runs multiple passes (--val_passes) with random
-    augmentations to capture lighting variation in the threshold."""
+    Uses --val_dir if provided, otherwise reads from {data_path}/{item}/validation/."""
     from industrial.inp_former.utils import cal_anomaly_maps, get_gaussian_kernel
 
     model, embed_dim, *_ = build_model(args, device)
@@ -398,43 +397,44 @@ def validate_one_category(args, item, data_transform, device, use_tiling, tile_o
     model.load_state_dict(torch.load(os.path.join(cat_save_dir, 'model.pth')), strict=True)
     model.eval()
 
-    val_path = os.path.join(args.data_path, item, 'validation', 'good')
+    # Use --val_dir if provided (for augmented validation), otherwise default
+    val_root = getattr(args, 'val_dir', None)
+    if val_root:
+        val_path = os.path.join(val_root, item, 'validation', 'good')
+    else:
+        val_path = os.path.join(args.data_path, item, 'validation', 'good')
+
     if not os.path.isdir(val_path):
-        print_fn(f'{item}: no validation/good dir found, skipping')
+        print_fn(f'{item}: no validation/good dir found at {val_path}, skipping')
         return
 
     gaussian_kernel = get_gaussian_kernel(kernel_size=5, sigma=4).to(device)
     out_dir = os.path.join(args.save_dir, args.save_name, 'val_heatmaps', item, 'good')
     os.makedirs(out_dir, exist_ok=True)
 
-    n_passes = args.val_passes if getattr(args, 'lighting_aug', False) else 1
+    val_folder = os.path.dirname(val_path)  # .../validation/
+    val_data = ImageFolder(root=val_folder, transform=data_transform)
+    val_dataloader = torch.utils.data.DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
+
     total_saved = 0
+    sample_idx = 0
+    with torch.no_grad():
+        for imgs, _ in tqdm(val_dataloader, desc=f'Validation maps: {item}', ncols=80):
+            imgs = imgs.to(device)
+            output = model(imgs)
+            en, de = output[0], output[1]
+            anomaly_map, _ = cal_anomaly_maps(en, de, args.crop_size)
+            anomaly_map = gaussian_kernel(anomaly_map)
 
-    for pass_idx in range(n_passes):
-        val_data = ImageFolder(root=os.path.join(args.data_path, item, 'validation'), transform=data_transform)
-        val_dataloader = torch.utils.data.DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
+            for i in range(imgs.shape[0]):
+                fpath = val_data.samples[sample_idx][0]
+                fname = os.path.splitext(os.path.basename(fpath))[0]
+                raw_amap = anomaly_map[i, 0].cpu().numpy()
+                np.save(os.path.join(out_dir, f'{fname}_heatmap_raw.npy'), raw_amap)
+                sample_idx += 1
+                total_saved += 1
 
-        sample_idx = 0
-        suffix = '' if pass_idx == 0 else f'_aug{pass_idx}'
-        desc = f'Validation maps: {item}' if n_passes == 1 else f'Validation maps: {item} (pass {pass_idx + 1}/{n_passes})'
-
-        with torch.no_grad():
-            for imgs, _ in tqdm(val_dataloader, desc=desc, ncols=80):
-                imgs = imgs.to(device)
-                output = model(imgs)
-                en, de = output[0], output[1]
-                anomaly_map, _ = cal_anomaly_maps(en, de, args.crop_size)
-                anomaly_map = gaussian_kernel(anomaly_map)
-
-                for i in range(imgs.shape[0]):
-                    fpath = val_data.samples[sample_idx][0]
-                    fname = os.path.splitext(os.path.basename(fpath))[0]
-                    raw_amap = anomaly_map[i, 0].cpu().numpy()
-                    np.save(os.path.join(out_dir, f'{fname}{suffix}_heatmap_raw.npy'), raw_amap)
-                    sample_idx += 1
-                    total_saved += 1
-
-    print_fn(f'{item}: {total_saved} validation heatmaps saved to {out_dir} ({n_passes} pass{"es" if n_passes > 1 else ""})')
+    print_fn(f'{item}: {total_saved} validation heatmaps saved to {out_dir}')
 
 
 def main(args):
@@ -514,6 +514,7 @@ parser.add_argument('--tiling', action='store_true', help='Use overlapping tilin
 parser.add_argument('--tile_overlap', type=float, default=0.2)
 parser.add_argument('--target_tile', type=int, default=1000)
 parser.add_argument('--item', type=str, default=None, help='Single category')
+parser.add_argument('--val_dir', type=str, default=None, help='Override validation image directory (e.g., augmented val set)')
 
 
 def _setup_and_run(args):
