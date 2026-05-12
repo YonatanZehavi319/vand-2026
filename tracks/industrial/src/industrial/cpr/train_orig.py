@@ -33,6 +33,7 @@ def get_args_parser():
     parser.add_argument("-fd", "--foreground-dir", type=str, default=None, help="foreground dir")
     parser.add_argument("-rd", "--retrieval-dir", type=str, default='log/retrieval_mvtec_DenseNet_features.denseblock1_320', help="retrieval dir")
     parser.add_argument("-dd", "--data-dir", type=str, default='log/synthetic_mvtec_640_12000_True_jpg/', help="synthetic data dir")
+    parser.add_argument("--data-root", type=str, default=None, help="dataset root dir (default: ./data/{dataset_name})")
     parser.add_argument("--sub-categories", type=str, nargs="+", default=None, help="sub categories", choices=list(chain(*[x[0] for x in list(DATASET_INFOS.values())])))
     # train
     parser.add_argument("-bs", "--batch-size", type=int, default=32)
@@ -108,7 +109,8 @@ def main(args):
         logger_handler_id = logger.add(os.path.join(args.log_path, sub_category, 'runtime.log'), mode='w')
         seed_worker       = fix_seeds(66)
         model             = create_model(args.pretrained_model, layers).cuda().train()
-        dataset           = CPRDataset(args.dataset_name, sub_category, args.resize, args.data_dir, args.scales, args.region_sizes, args.retrieval_dir, args.foreground_dir)
+        _data_root = getattr(args, 'data_root', None) or os.path.join('./data', args.dataset_name)
+        dataset           = CPRDataset(args.dataset_name, sub_category, args.resize, args.data_dir, args.scales, args.region_sizes, args.retrieval_dir, args.foreground_dir, data_root=_data_root)
         writer            = SummaryWriter(os.path.join(args.log_path, sub_category), flush_secs=10)
         dataloader        = DataLoader(dataset, batch_size=args.batch_size, sampler=InfiniteSampler(dataset), num_workers=args.num_workers, pin_memory=True, worker_init_fn=seed_worker)
         optimizer         = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=1e-2)
