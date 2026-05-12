@@ -129,7 +129,7 @@ def main(args):
             optimizer.step()
             [writer.add_scalar(f"train/{k}", v.item(), global_step) for k, v in loss_d.items()]
             if global_step % args.test_per_steps == 0 or global_step == args.steps: 
-                ret = test(model, dataset.train_fns, dataset.test_fns, dataset.retrieval_result, dataset.foreground_result, args.resize, args.region_sizes, dataset.root_dir, args.k_nearest, args.T)
+                ret = test(model, dataset.train_fns, dataset.test_fns, dataset.retrieval_result, dataset.foreground_result, args.resize, args.region_sizes, dataset.root_dir, args.k_nearest, args.T, gt_base=dataset.gt_base)
                 torch.save(model.state_dict(), os.path.join(args.log_path, sub_category, f'{global_step:05d}.pth'))
                 logger.info(f'[{global_step}] {sub_category} test result: {" ".join([f"{k}: {v:.4f}" for k, v in ret.items()])}')
                 [writer.add_scalar(f"test/{k}", v, global_step) for k, v in ret.items()]

@@ -69,37 +69,44 @@ class CPRDataset(Dataset):
         self.train_fns = sorted(glob(os.path.join(self.root_dir, 'train/*/*')))
         # Auto-detect AD 2 (test_public/) vs AD 1 (test/)
         test_dir_name = 'test_public' if os.path.isdir(os.path.join(self.root_dir, 'test_public')) else 'test'
-        self.test_fns = sorted(glob(os.path.join(self.root_dir, test_dir_name, '*/*.png')) +
-                               glob(os.path.join(self.root_dir, test_dir_name, '*/*.JPG')))
+        self.test_dir = os.path.join(self.root_dir, test_dir_name)
+        self.test_fns = sorted(glob(os.path.join(self.test_dir, '*/*.png')) +
+                               glob(os.path.join(self.test_dir, '*/*.JPG')))
         self.test_fns = [f for f in self.test_fns if '/ground_truth/' not in f]
-        
+        # GT location: AD 2 nests it under the test split dir
+        ad2_gt = os.path.join(self.test_dir, 'ground_truth')
+        ad1_gt = os.path.join(self.root_dir, 'ground_truth')
+        self.gt_base = ad2_gt if os.path.isdir(ad2_gt) else ad1_gt
+
         if self.nAnomaly > 0:  # supervised
             _normal_data = []
             _outlier_data = []
-            for anomaly_name in sorted(os.listdir(os.path.join(self.root_dir, 'test'))):
-                for fn in sorted(os.listdir(os.path.join(self.root_dir, 'test', anomaly_name))):
-                    image_fn = os.path.join(self.root_dir, 'test', anomaly_name, fn)
+            for anomaly_name in sorted(os.listdir(self.test_dir)):
+                if anomaly_name == 'ground_truth':
+                    continue
+                for fn in sorted(os.listdir(os.path.join(self.test_dir, anomaly_name))):
+                    image_fn = os.path.join(self.test_dir, anomaly_name, fn)
                     if anomaly_name == 'good':
                         _normal_data.append(image_fn)
                     else:
                         _outlier_data.append(image_fn)
             np.random.RandomState(42).shuffle(_outlier_data)  # DRA
-            self.test_fns = _outlier_data[self.nAnomaly:] + _normal_data  # delete training samples 
+            self.test_fns = _outlier_data[self.nAnomaly:] + _normal_data  # delete training samples
             for image_fn in _outlier_data[:self.nAnomaly]:  # cache
                 k = os.path.relpath(image_fn, os.path.join(self.root_dir))
                 image_name = os.path.basename(k)[:-4]
                 anomaly_name = os.path.dirname(k).rsplit('/', 1)[-1]
-                mask_fn = os.path.join(self.root_dir, 'ground_truth', anomaly_name, image_name + '_mask.png')
+                mask_fn = os.path.join(self.gt_base, anomaly_name, image_name + '_mask.png')
                 self.outlier_data.append({'image_fn': image_fn, 'mask_fn': mask_fn, 'k': k, 'sub_category': sub_category, 'is_object': self.is_object})
                 image = self.read_image(image_fn)
                 mask = self.read_mask(mask_fn)
                 self.outlier_data_cache[k] = (image, mask)
-            
+
         for image_fn in self.test_fns:
             k = os.path.relpath(image_fn, os.path.join(self.root_dir))
             anomaly_name = os.path.dirname(k).rsplit('/', 1)[-1]
             image_name = os.path.basename(k)[:-4]
-            mask_fn = os.path.join(self.root_dir, 'ground_truth', anomaly_name, image_name + '_mask.png') if anomaly_name != 'good' else None
+            mask_fn = os.path.join(self.gt_base, anomaly_name, image_name + '_mask.png') if anomaly_name != 'good' else None
             self.test_infos.append({'image_fn': image_fn, 'mask_fn': mask_fn, 'k': k, 'sub_category': sub_category, 'is_object': self.is_object})
         
         for image_fn in self.train_fns:
