@@ -355,17 +355,22 @@ def test_one_category(args, item, data_transform, gt_transform, device, use_tili
         evt_params = fit_evt_null(model, evt_dl, device)
         print_fn(f'{item}: EVT fitted (shape={evt_params[0]:.4f}, loc={evt_params[1]:.6f}, scale={evt_params[2]:.6f})')
 
-    # Evaluate
-    test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
-    if use_tiling:
-        results = evaluation_batch_tiled(model, test_dataloader, device, max_ratio=0.01, resize_mask=256)
-    elif seg_head_model is not None:
-        results = evaluation_batch_with_seg(model, seg_head_model, test_dataloader, device, max_ratio=0.01, resize_mask=256)
+    # Evaluate (skip for private splits — no GT available)
+    split = getattr(args, 'split', None)
+    has_gt = split is None or split == 'test_public'
+    if has_gt:
+        test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
+        if use_tiling:
+            results = evaluation_batch_tiled(model, test_dataloader, device, max_ratio=0.01, resize_mask=256)
+        elif seg_head_model is not None:
+            results = evaluation_batch_with_seg(model, seg_head_model, test_dataloader, device, max_ratio=0.01, resize_mask=256)
+        else:
+            results = evaluation_batch(model, test_dataloader, device, max_ratio=0.01, resize_mask=256)
+        auroc_sp, ap_sp, f1_sp, auroc_px, ap_px, f1_px, aupro_px = results
+        print_fn('{}: I-Auroc:{:.4f}, I-AP:{:.4f}, I-F1:{:.4f}, P-AUROC:{:.4f}, P-AP:{:.4f}, P-F1:{:.4f}, P-AUPRO:{:.4f}'.format(
+            item, auroc_sp, ap_sp, f1_sp, auroc_px, ap_px, f1_px, aupro_px))
     else:
-        results = evaluation_batch(model, test_dataloader, device, max_ratio=0.01, resize_mask=256)
-    auroc_sp, ap_sp, f1_sp, auroc_px, ap_px, f1_px, aupro_px = results
-    print_fn('{}: I-Auroc:{:.4f}, I-AP:{:.4f}, I-F1:{:.4f}, P-AUROC:{:.4f}, P-AP:{:.4f}, P-F1:{:.4f}, P-AUPRO:{:.4f}'.format(
-        item, auroc_sp, ap_sp, f1_sp, auroc_px, ap_px, f1_px, aupro_px))
+        print_fn(f'{item}: skipping evaluation (no GT for {split})')
 
     # Save maps
     if args.save_maps:
