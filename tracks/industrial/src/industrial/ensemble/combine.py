@@ -73,7 +73,7 @@ def compute_auto_cpr_weights(inp_val_dir, cpr_val_dir, categories, save_size):
 
         if edge_corrs:
             mean_ec = np.mean(edge_corrs)
-            w = max(0.0, (mean_ec - 0.1) * 1.15)
+            w = max(0.0, mean_ec)
             weights[category] = w
             print(f"  {category}: EdgeCorr={mean_ec:.4f}, cpr_weight={w:.3f}")
         else:
