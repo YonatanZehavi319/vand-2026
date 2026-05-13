@@ -57,7 +57,7 @@ def compute_auto_cpr_weights(inp_val_dir, categories, save_size):
 
 
 def compute_spatial_prior(inp_val_dir, cpr_val_dir, categories, save_size, inp_weight, cpr_weight_map,
-                          global_stats=None, combine_mode='average', cpr_power=1.0, grid_size=4):
+                          global_stats=None, combine_mode='average', cpr_power=1.0, grid_size=4, suppress_floor=0.3):
     """Build per-category spatial suppression maps from validation heatmaps.
 
     For each category, divides the heatmap into a grid and computes the mean
@@ -104,7 +104,6 @@ def compute_spatial_prior(inp_val_dir, cpr_val_dir, categories, save_size, inp_w
             # Normalize to [0, 1] where 0 = highest FP area, 1 = lowest
             grid_weights = 1.0 - (grid_means - gmin) / (gmax - gmin)
             # Scale to [suppress_floor, 1.0] so we don't fully zero out any region
-            suppress_floor = 0.3
             grid_weights = suppress_floor + grid_weights * (1.0 - suppress_floor)
         else:
             grid_weights = np.ones((grid_size, grid_size))

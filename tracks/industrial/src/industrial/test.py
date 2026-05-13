@@ -56,6 +56,7 @@ def main() -> None:
     parser.add_argument('--cpr_power', type=float, default=1.0, help='Power for CPR signal in boost mode')
     parser.add_argument('--spatial_prior', action='store_true', help='Apply spatial FP suppression')
     parser.add_argument('--grid_size', type=int, default=4, help='Grid size for spatial prior')
+    parser.add_argument('--suppress_floor', type=float, default=0.3, help='Min suppression weight')
 
     args = parser.parse_args()
 
@@ -168,6 +169,7 @@ def main() -> None:
         ens.cpr_power = args.cpr_power
         ens.spatial_prior = args.spatial_prior
         ens.grid_size = args.grid_size
+        ens.suppress_floor = args.suppress_floor
 
         run_ensemble(ens)
 

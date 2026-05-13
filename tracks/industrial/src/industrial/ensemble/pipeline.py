@@ -70,10 +70,11 @@ def run_ensemble(args):
     if spatial_prior and args.inp_val_dir and args.cpr_val_dir:
         grid_size = getattr(args, 'grid_size', 4)
         print(f"Computing spatial priors ({grid_size}x{grid_size} grid)...")
+        suppress_floor = getattr(args, 'suppress_floor', 0.3)
         spatial_priors_per_cat = compute_spatial_prior(
             args.inp_val_dir, args.cpr_val_dir, categories, save_size,
             args.inp_weight, cpr_weights_per_cat if cpr_weights_per_cat else {c: args.cpr_weight for c in categories},
-            combine_mode=combine_mode, cpr_power=cpr_power, grid_size=grid_size)
+            combine_mode=combine_mode, cpr_power=cpr_power, grid_size=grid_size, suppress_floor=suppress_floor)
 
     # Compute global stats and fit threshold from validation
     global_stats = None
@@ -305,6 +306,7 @@ def main():
     parser.add_argument('--cpr_power', type=float, default=1.0, help='Power applied to CPR signal in boost mode (default 1.0, >1 sharpens)')
     parser.add_argument('--spatial_prior', action='store_true', help='Apply spatial FP suppression from validation')
     parser.add_argument('--grid_size', type=int, default=4, help='Grid size for spatial prior (default 4)')
+    parser.add_argument('--suppress_floor', type=float, default=0.3, help='Min suppression weight (default 0.3, lower=more aggressive)')
 
     args = parser.parse_args()
     run_ensemble(args)
