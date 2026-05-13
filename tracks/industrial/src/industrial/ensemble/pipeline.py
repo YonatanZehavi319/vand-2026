@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 
 from industrial.ensemble.combine import (
     combine_heatmaps,
+    compute_auto_cpr_weights,
     compute_global_stats,
     fit_evt_from_validation,
     evt_threshold,
@@ -52,6 +53,13 @@ def run_ensemble(args):
     # Where to find original validation images for guided filtering
     val_image_dir = getattr(args, 'val_image_dir', None)
 
+    # Compute per-category CPR weights if auto mode
+    auto_cpr = getattr(args, 'auto_cpr_weight', False)
+    cpr_weights_per_cat = {}
+    if auto_cpr and args.inp_val_dir:
+        print("Computing auto CPR weights from INP SNR...")
+        cpr_weights_per_cat = compute_auto_cpr_weights(args.inp_val_dir, categories, save_size)
+
     # Compute global stats and fit threshold from validation
     global_stats = None
     thresholds_per_cat = {}
@@ -65,9 +73,10 @@ def run_ensemble(args):
             print("Fitting EVT from validation heatmaps...")
             evt_params_per_cat = {}
             for category in categories:
+                cat_cpr_weight = cpr_weights_per_cat.get(category, args.cpr_weight)
                 params = fit_evt_from_validation(
                     args.inp_val_dir, args.cpr_val_dir, category,
-                    save_size, args.inp_weight, args.cpr_weight, global_stats=global_stats,
+                    save_size, args.inp_weight, cat_cpr_weight, global_stats=global_stats,
                     combine_mode=combine_mode, post_process_args=pp_args, val_image_dir=val_image_dir)
                 if params is not None:
                     evt_params_per_cat[category] = params
@@ -95,9 +104,10 @@ def run_ensemble(args):
             print("Computing validation max thresholds...")
             val_maxes = {}
             for category in categories:
+                cat_cpr_weight = cpr_weights_per_cat.get(category, args.cpr_weight)
                 val_max = compute_val_max(
                     args.inp_val_dir, args.cpr_val_dir, category,
-                    save_size, args.inp_weight, args.cpr_weight,
+                    save_size, args.inp_weight, cat_cpr_weight,
                     global_stats=global_stats, percentile=args.val_percentile,
                     combine_mode=combine_mode, post_process_args=pp_args, val_image_dir=val_image_dir)
                 if val_max is not None:
@@ -115,6 +125,7 @@ def run_ensemble(args):
 
         sub_dirs = sorted(os.listdir(inp_cat_dir))
         n_combined = 0
+        cat_cpr_weight = cpr_weights_per_cat.get(category, args.cpr_weight)
 
         for sub_dir in sub_dirs:
             inp_sub = os.path.join(inp_cat_dir, sub_dir)
@@ -134,7 +145,7 @@ def run_ensemble(args):
                 fname = os.path.basename(npy_path).replace('_heatmap_raw.npy', '')
 
                 combined, was_combined = combine_heatmaps(
-                    inp_sub, cpr_sub, fname, save_size, args.inp_weight, args.cpr_weight,
+                    inp_sub, cpr_sub, fname, save_size, args.inp_weight, cat_cpr_weight,
                     global_stats=global_stats, combine_mode=combine_mode)
                 if combined is None:
                     continue
@@ -248,6 +259,8 @@ def main():
     # Per-image normalization
     parser.add_argument('--median_sub', action='store_true', help='Subtract per-image median before thresholding')
     parser.add_argument('--val_image_dir', type=str, default=None, help='Validation images dir (for guided filter during EVT fitting)')
+    # Auto CPR weight
+    parser.add_argument('--auto_cpr_weight', action='store_true', help='Auto-compute per-category CPR weight from INP SNR')
 
     args = parser.parse_args()
     run_ensemble(args)

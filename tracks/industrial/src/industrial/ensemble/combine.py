@@ -29,6 +29,33 @@ def load_heatmap_npy(path):
     return None
 
 
+def compute_auto_cpr_weights(inp_val_dir, categories, save_size):
+    """Compute per-category CPR weight based on INP SNR: max(0, (SNR - 2) / 2)."""
+    weights = {}
+    for category in categories:
+        inp_good = os.path.join(inp_val_dir, category, 'good')
+        if not os.path.isdir(inp_good):
+            weights[category] = 0.0
+            continue
+
+        snrs = []
+        for npy_path in sorted(glob(os.path.join(inp_good, '*_heatmap_raw.npy'))):
+            amap = np.load(npy_path).astype(np.float32)
+            amap = cv2.resize(amap, (save_size, save_size))
+            snr = amap.max() / (amap.mean() + 1e-8)
+            snrs.append(snr)
+
+        if snrs:
+            mean_snr = np.mean(snrs)
+            w = max(0.0, (mean_snr - 2.0) / 2.0)
+            weights[category] = w
+            print(f"  {category}: INP SNR={mean_snr:.2f}, cpr_weight={w:.3f}")
+        else:
+            weights[category] = 0.0
+
+    return weights
+
+
 def combine_heatmaps(inp_dir, cpr_dir, fname, save_size, inp_weight, cpr_weight, global_stats=None, combine_mode='average'):
     """Load and combine INP-Former + CPR heatmaps for a single image.
 

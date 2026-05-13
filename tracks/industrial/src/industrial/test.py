@@ -49,6 +49,8 @@ def main() -> None:
     # Per-image normalization
     parser.add_argument('--median_sub', action='store_true', help='Subtract per-image median')
     parser.add_argument('--val_image_dir', type=str, default=None, help='Validation images dir (for guided filter during EVT fitting)')
+    # Auto CPR weight
+    parser.add_argument('--auto_cpr_weight', action='store_true', help='Auto-compute per-category CPR weight from INP SNR')
 
     args = parser.parse_args()
 
@@ -152,6 +154,7 @@ def main() -> None:
         ens.adaptive_strength = args.adaptive_strength
         ens.median_sub = args.median_sub
         ens.val_image_dir = args.val_image_dir
+        ens.auto_cpr_weight = args.auto_cpr_weight
 
         run_ensemble(ens)
 
