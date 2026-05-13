@@ -175,7 +175,7 @@ class MVTecDataset(torch.utils.data.Dataset):
         img_path, gt, label, img_type = self.img_paths[idx], self.gt_paths[idx], self.labels[idx], self.types[idx]
         img = Image.open(img_path).convert('RGB')
         img = self.transform(img)
-        if label == 0:
+        if label <= 0:
             gt = torch.zeros([1, img.size()[-2], img.size()[-2]])
         else:
             gt = Image.open(gt)
@@ -354,7 +354,7 @@ class TiledMVTecDataset(torch.utils.data.Dataset):
         tiles, tile_info = extract_tiles(img, self.overlap, target_tile=self.target_tile)
         tile_img = self.transform(tiles[tile_idx])
 
-        if label == 0:
+        if label <= 0:
             tile_gt = torch.zeros([1, tile_img.size(-2), tile_img.size(-1)])
         else:
             gt = Image.open(self.gt_paths[img_idx]).convert('L')
@@ -410,7 +410,7 @@ class RealIADDataset(torch.utils.data.Dataset):
         if self.phase == 'train':
             return img, label
 
-        if label == 0:
+        if label <= 0:
             gt = torch.zeros([1, img.size()[-2], img.size()[-2]])
         else:
             gt = Image.open(gt)
