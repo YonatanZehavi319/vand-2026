@@ -187,7 +187,8 @@ def combine_heatmaps(inp_dir, cpr_dir, fname, save_size, inp_weight, cpr_weight,
             combined = inp_val * (1 + cpr_weight * cpr_val ** cpr_power)
         elif combine_mode == 'gated_boost':
             gate = (cpr_val > np.percentile(cpr_val, 95)).astype(np.float32)
-            combined = inp_val * (1 + cpr_weight * cpr_val ** cpr_power * gate)
+            cpr_clipped = np.clip(cpr_val, 0, None)
+            combined = inp_val * (1 + cpr_weight * cpr_clipped ** cpr_power * gate)
         else:
             combined = (inp_weight * inp_val + cpr_weight * cpr_val) / (inp_weight + cpr_weight)
         return combined, True
