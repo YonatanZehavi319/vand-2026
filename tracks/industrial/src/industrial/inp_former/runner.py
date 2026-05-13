@@ -329,10 +329,11 @@ def test_one_category(args, item, data_transform, gt_transform, device, use_tili
     model.eval()
 
     test_path = os.path.join(args.data_path, item)
+    split = getattr(args, 'split', None)
     if use_tiling:
-        test_data = TiledMVTecDataset(root=test_path, transform=data_transform, gt_transform=gt_transform, phase="test", overlap=tile_overlap, target_tile=args.target_tile)
+        test_data = TiledMVTecDataset(root=test_path, transform=data_transform, gt_transform=gt_transform, phase="test", overlap=tile_overlap, target_tile=args.target_tile, split=split)
     else:
-        test_data = MVTecDataset(root=test_path, transform=data_transform, gt_transform=gt_transform, phase="test")
+        test_data = MVTecDataset(root=test_path, transform=data_transform, gt_transform=gt_transform, phase="test", split=split)
 
     # Seg head
     seg_head_model = None
@@ -556,6 +557,7 @@ parser.add_argument('--tile_overlap', type=float, default=0.2)
 parser.add_argument('--target_tile', type=int, default=1000)
 parser.add_argument('--item', type=str, default=None, help='Single category')
 parser.add_argument('--val_dir', type=str, default=None, help='Override validation image directory (e.g., augmented val set)')
+parser.add_argument('--split', type=str, default=None, help='Dataset split: test_public, test_private, test_private_mixed')
 
 
 def _setup_and_run(args):

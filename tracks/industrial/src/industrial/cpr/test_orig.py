@@ -42,6 +42,7 @@ def get_args_parser():
     parser.add_argument("--validation", action="store_true", help="Run on validation/good images and save heatmaps for EVT fitting")
     parser.add_argument("--data-root", type=str, default=None, help="dataset root dir (default: ./data/{dataset_name})")
     parser.add_argument("--val-dir", type=str, default=None, help="Override validation image directory (e.g., augmented val set)")
+    parser.add_argument("--split", type=str, default=None, help="Dataset split: test_public, test_private, test_private_mixed")
     return parser
 
 @torch.no_grad()
@@ -323,17 +324,27 @@ def main(args):
                 continue
             validate(model, train_fns, val_fns, retrieval_result, foreground_result, args.resize, args.region_sizes, root_dir, args.k_nearest, args.save_dir, sub_category)
         else:
-            # Auto-detect AD 2 vs AD 1 test layout
-            if os.path.isdir(os.path.join(root_dir, 'test_public')):
+            # Determine test directory
+            split = getattr(args, 'split', None)
+            if split is not None:
+                test_dir = os.path.join(root_dir, split)
+                gt_base = os.path.join(test_dir, 'ground_truth')
+            elif os.path.isdir(os.path.join(root_dir, 'test_public')):
                 test_dir = os.path.join(root_dir, 'test_public')
                 gt_base = os.path.join(test_dir, 'ground_truth')
             else:
                 test_dir = os.path.join(root_dir, 'test')
                 gt_base = os.path.join(root_dir, 'ground_truth')
 
+            # For flat splits (test_private, test_private_mixed), glob directly
             test_fns = sorted(glob(os.path.join(test_dir, '*/*.png')) +
                               glob(os.path.join(test_dir, '*/*.JPG')) +
                               glob(os.path.join(test_dir, '*/*.bmp')))
+            if not test_fns:
+                # Flat directory (no subdirs)
+                test_fns = sorted(glob(os.path.join(test_dir, '*.png')) +
+                                  glob(os.path.join(test_dir, '*.JPG')) +
+                                  glob(os.path.join(test_dir, '*.bmp')))
             # Filter out ground_truth images from test list
             test_fns = [f for f in test_fns if '/ground_truth/' not in f]
 

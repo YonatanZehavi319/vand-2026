@@ -14,6 +14,7 @@ def main() -> None:
     parser.add_argument('--data_dir', type=str, required=True, help='Path to dataset root')
     parser.add_argument('--out_dir', type=str, default='./output', help='Output directory')
     parser.add_argument('--item', type=str, default=None, help='Single category')
+    parser.add_argument('--split', type=str, default=None, help='Dataset split: test_public, test_private, test_private_mixed')
     # Ensemble args
     parser.add_argument('--save_size', type=int, default=512)
     parser.add_argument('--inp_weight', type=float, default=1.0)
@@ -80,6 +81,8 @@ def main() -> None:
             inp_argv += ['--tiling', '--target_tile', str(args.target_tile)]
         if args.item:
             inp_argv += ['--item', args.item]
+        if args.split:
+            inp_argv += ['--split', args.split]
         inp_test_args = inp_parser.parse_args(inp_argv)
         inp_run(inp_test_args)
 
@@ -106,6 +109,8 @@ def main() -> None:
             cpr_argv += ['--checkpoints', args.cpr_checkpoints]
         if args.item:
             cpr_argv += ['--sub-categories', args.item]
+        if args.split:
+            cpr_argv += ['--split', args.split]
         cpr_test_args = get_test_args_parser().parse_args(cpr_argv)
         cpr_test(cpr_test_args)
 
