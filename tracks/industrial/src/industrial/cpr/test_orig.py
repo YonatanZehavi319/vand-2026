@@ -118,7 +118,10 @@ def test(model: CPR, train_fns, test_fns, retrieval_result, foreground_result, r
         
         features_list, ori_features_list = model(image_t[None].cuda())
         features_list = [features / (torch.norm(features, p=2, dim=1, keepdim=True) + 1e-8) for features in features_list]
-        retrieval_idxs = [k2id[retrieval_k] for retrieval_k in retrieval_result[k][:knn]]
+        if k in retrieval_result:
+            retrieval_idxs = [k2id[retrieval_k] for retrieval_k in retrieval_result[k][:knn]]
+        else:
+            retrieval_idxs = list(range(min(knn, len(train_fns))))
         retrieval_features_list = [train_local_features[i][retrieval_idxs] for i in range(len(features_list))]
         
         scores = []
@@ -151,12 +154,16 @@ def test(model: CPR, train_fns, test_fns, retrieval_result, foreground_result, r
         preds['i'].append(det_score)
         preds['p'].append(score_g)
     gts = torch.from_numpy(np.stack(gts)).cuda()
-    metrics = {
-        'pro': compute_pro_torch(gts, torch.stack(preds['p'])),
-        'ap': compute_ap_torch(gts, torch.stack(preds['p'])),
-        'pixel-auc': compute_pixel_auc_torch(gts, torch.stack(preds['p'])),
-        'image-auc': compute_image_auc_torch(torch.tensor(i_gts).long().cuda(), torch.stack(preds['i'])),
-    }
+    has_gt = any(g > 0 for g in i_gts)
+    if has_gt:
+        metrics = {
+            'pro': compute_pro_torch(gts, torch.stack(preds['p'])),
+            'ap': compute_ap_torch(gts, torch.stack(preds['p'])),
+            'pixel-auc': compute_pixel_auc_torch(gts, torch.stack(preds['p'])),
+            'image-auc': compute_image_auc_torch(torch.tensor(i_gts).long().cuda(), torch.stack(preds['i'])),
+        }
+    else:
+        metrics = {'pro': 0, 'ap': 0, 'pixel-auc': 0, 'image-auc': 0}
 
     if save_dir and (save_maps or save_scores):
         import csv
