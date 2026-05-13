@@ -29,27 +29,53 @@ def load_heatmap_npy(path):
     return None
 
 
-def compute_auto_cpr_weights(inp_val_dir, categories, save_size):
-    """Compute per-category CPR weight based on INP SNR: max(0, (SNR - 2) / 2)."""
+def _gradient_correlation(map1, map2, size):
+    """Correlation between gradient magnitudes of two maps."""
+    m1 = map1.reshape(size, size)
+    m2 = map2.reshape(size, size)
+    gx1 = cv2.Sobel(m1, cv2.CV_32F, 1, 0, ksize=3)
+    gy1 = cv2.Sobel(m1, cv2.CV_32F, 0, 1, ksize=3)
+    gx2 = cv2.Sobel(m2, cv2.CV_32F, 1, 0, ksize=3)
+    gy2 = cv2.Sobel(m2, cv2.CV_32F, 0, 1, ksize=3)
+    grad1 = np.sqrt(gx1**2 + gy1**2).flatten()
+    grad2 = np.sqrt(gx2**2 + gy2**2).flatten()
+    corr = np.corrcoef(grad1, grad2)[0, 1]
+    return corr if not np.isnan(corr) else 0.0
+
+
+def compute_auto_cpr_weights(inp_val_dir, cpr_val_dir, categories, save_size):
+    """Compute per-category CPR weight based on edge correlation: max(0, EdgeCorr - 0.1) * 1.15."""
     weights = {}
     for category in categories:
         inp_good = os.path.join(inp_val_dir, category, 'good')
+        cpr_good = os.path.join(cpr_val_dir, category, 'good')
         if not os.path.isdir(inp_good):
             weights[category] = 0.0
             continue
 
-        snrs = []
+        edge_corrs = []
         for npy_path in sorted(glob(os.path.join(inp_good, '*_heatmap_raw.npy'))):
-            amap = np.load(npy_path).astype(np.float32)
-            amap = cv2.resize(amap, (save_size, save_size))
-            snr = amap.max() / (amap.mean() + 1e-8)
-            snrs.append(snr)
+            fname = os.path.basename(npy_path).replace('_heatmap_raw.npy', '')
+            cpr_npy = os.path.join(cpr_good, f'{fname}_heatmap_raw.npy')
+            if not os.path.exists(cpr_npy):
+                continue
 
-        if snrs:
-            mean_snr = np.mean(snrs)
-            w = max(0.0, (mean_snr - 2.0) / 2.0)
+            inp_map = np.load(npy_path).astype(np.float32)
+            cpr_map = np.load(cpr_npy).astype(np.float32)
+            inp_map = cv2.resize(inp_map, (save_size, save_size))
+            cpr_map = cv2.resize(cpr_map, (save_size, save_size))
+
+            inp_norm = (inp_map - inp_map.min()) / (inp_map.max() - inp_map.min() + 1e-8)
+            cpr_norm = (cpr_map - cpr_map.min()) / (cpr_map.max() - cpr_map.min() + 1e-8)
+
+            ec = _gradient_correlation(inp_norm, cpr_norm, save_size)
+            edge_corrs.append(ec)
+
+        if edge_corrs:
+            mean_ec = np.mean(edge_corrs)
+            w = max(0.0, (mean_ec - 0.1) * 1.15)
             weights[category] = w
-            print(f"  {category}: INP SNR={mean_snr:.2f}, cpr_weight={w:.3f}")
+            print(f"  {category}: EdgeCorr={mean_ec:.4f}, cpr_weight={w:.3f}")
         else:
             weights[category] = 0.0
 

@@ -62,7 +62,7 @@ def run_ensemble(args):
     cpr_weights_per_cat = {}
     if auto_cpr and args.inp_val_dir:
         print("Computing auto CPR weights from INP SNR...")
-        cpr_weights_per_cat = compute_auto_cpr_weights(args.inp_val_dir, categories, save_size)
+        cpr_weights_per_cat = compute_auto_cpr_weights(args.inp_val_dir, args.cpr_val_dir, categories, save_size)
 
     # Compute spatial prior if requested
     spatial_prior = getattr(args, 'spatial_prior', False)
