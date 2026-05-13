@@ -220,6 +220,50 @@ def absolute_threshold(combined_map, val_max):
     return ((combined_map > val_max) * 255).astype(np.uint8)
 
 
+def compute_mean_std_from_validation(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, cpr_weight,
+                                     global_stats=None, combine_mode='average', post_process_args=None, val_image_dir=None):
+    """Compute mean and std of combined validation scores for a category."""
+    inp_val_good = os.path.join(inp_val_dir, category, 'good')
+    cpr_val_good = os.path.join(cpr_val_dir, category, 'good')
+
+    if not os.path.isdir(inp_val_good):
+        print(f"  WARNING: No INP validation heatmaps for {category}")
+        return None
+
+    inp_npy_files = sorted(glob(os.path.join(inp_val_good, '*_heatmap_raw.npy')))
+    pp = post_process_args or {}
+
+    all_pixel_scores = []
+    for npy_path in inp_npy_files:
+        fname = os.path.basename(npy_path).replace('_heatmap_raw.npy', '')
+        combined, _ = combine_heatmaps(inp_val_good, cpr_val_good, fname, save_size, inp_weight, cpr_weight, global_stats=global_stats, combine_mode=combine_mode)
+        if combined is not None:
+            guide_img = None
+            if pp.get('guided') and val_image_dir:
+                img_path = _find_val_image(val_image_dir, category, fname)
+                if img_path is not None:
+                    guide_img = cv2.imread(img_path)
+                    guide_img = cv2.resize(guide_img, (save_size, save_size))
+            combined = post_process_heatmap(combined, guide_img=guide_img, **pp)
+            all_pixel_scores.append(combined.flatten())
+
+    if not all_pixel_scores:
+        return None
+
+    all_pixel_scores = np.concatenate(all_pixel_scores)
+    mean = float(all_pixel_scores.mean())
+    std = float(all_pixel_scores.std())
+    print(f'  {category}: mean={mean:.6f}, std={std:.6f}')
+    return mean, std
+
+
+def mean_std_threshold(combined_map, mean_std_params, k=3.0):
+    """Threshold at mean + k*std. Pixels above threshold are anomalous."""
+    mean, std = mean_std_params
+    threshold = mean + k * std
+    return ((combined_map > threshold) * 255).astype(np.uint8)
+
+
 def compute_val_max(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, cpr_weight,
                     global_stats=None, percentile=99.9, combine_mode='average', post_process_args=None, val_image_dir=None):
     """Compute the near-max of validation combined scores for a category."""

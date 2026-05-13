@@ -19,9 +19,10 @@ def main() -> None:
     parser.add_argument('--inp_weight', type=float, default=1.0)
     parser.add_argument('--cpr_weight', type=float, default=1.0)
     parser.add_argument('--zscore', action='store_true')
-    parser.add_argument('--threshold_method', type=str, default='evt', choices=['evt', 'val_max', 'otsu'])
+    parser.add_argument('--threshold_method', type=str, default='evt', choices=['evt', 'val_max', 'otsu', 'mean_std'])
     parser.add_argument('--evt_fdr', type=float, default=0.01)
     parser.add_argument('--val_percentile', type=float, default=99.9)
+    parser.add_argument('--mean_std_k', type=float, default=3.0, help='k for mean+k*std threshold')
     parser.add_argument('--combine_mode', type=str, default='average', choices=['average', 'boost'],
                         help='How to combine heatmaps: average or boost (CPR boosts INP)')
     # INP-Former args
@@ -142,6 +143,7 @@ def main() -> None:
         ens.threshold_method = args.threshold_method
         ens.evt_fdr = args.evt_fdr
         ens.val_percentile = args.val_percentile
+        ens.mean_std_k = args.mean_std_k
         ens.combine_mode = args.combine_mode
         ens.bilateral = args.bilateral
         ens.bilateral_d = args.bilateral_d

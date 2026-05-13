@@ -23,6 +23,8 @@ from industrial.ensemble.combine import (
     fit_evt_from_validation,
     evt_threshold,
     post_process_heatmap,
+    compute_mean_std_from_validation,
+    mean_std_threshold,
     absolute_threshold,
     compute_val_max,
 )
@@ -114,6 +116,21 @@ def run_ensemble(args):
                     val_maxes[category] = val_max
             thresholds_per_cat = {'method': 'val_max', 'thresholds': val_maxes}
 
+        elif args.threshold_method == 'mean_std':
+            k = getattr(args, 'mean_std_k', 3.0)
+            print(f"Computing mean+{k}*std thresholds from validation...")
+            mean_std_per_cat = {}
+            for category in categories:
+                cat_cpr_weight = cpr_weights_per_cat.get(category, args.cpr_weight)
+                params = compute_mean_std_from_validation(
+                    args.inp_val_dir, args.cpr_val_dir, category,
+                    save_size, args.inp_weight, cat_cpr_weight,
+                    global_stats=global_stats, combine_mode=combine_mode,
+                    post_process_args=pp_args, val_image_dir=val_image_dir)
+                if params is not None:
+                    mean_std_per_cat[category] = params
+            thresholds_per_cat = {'method': 'mean_std', 'params': mean_std_per_cat, 'k': k}
+
     # Process test images
     for category in categories:
         inp_cat_dir = os.path.join(args.inp_dir, category)
@@ -193,6 +210,12 @@ def run_ensemble(args):
                             pred_mask = absolute_threshold(combined, val_max)
                         else:
                             pred_mask = _otsu_fallback(combined)
+                    elif thresholds_per_cat['method'] == 'mean_std':
+                        ms_params = thresholds_per_cat['params'].get(category)
+                        if ms_params is not None:
+                            pred_mask = mean_std_threshold(combined, ms_params, k=thresholds_per_cat['k'])
+                        else:
+                            pred_mask = _otsu_fallback(combined)
                 else:
                     pred_mask = _otsu_fallback(combined)
 
@@ -240,9 +263,10 @@ def main():
     parser.add_argument('--inp_val_dir', type=str, default=None)
     parser.add_argument('--cpr_val_dir', type=str, default=None)
     # Threshold method
-    parser.add_argument('--threshold_method', type=str, default='evt', choices=['evt', 'val_max', 'otsu'])
+    parser.add_argument('--threshold_method', type=str, default='evt', choices=['evt', 'val_max', 'otsu', 'mean_std'])
     parser.add_argument('--evt_fdr', type=float, default=0.01)
     parser.add_argument('--val_percentile', type=float, default=99.9, help='Percentile for val_max threshold')
+    parser.add_argument('--mean_std_k', type=float, default=3.0, help='k for mean+k*std threshold (default 3.0)')
     parser.add_argument('--combine_mode', type=str, default='average', choices=['average', 'boost'],
                         help='How to combine heatmaps: average (weighted avg) or boost (CPR boosts INP)')
     # Smoothing options
