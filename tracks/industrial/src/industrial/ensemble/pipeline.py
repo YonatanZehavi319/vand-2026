@@ -285,7 +285,7 @@ def main():
     parser.add_argument('--evt_fdr', type=float, default=0.01)
     parser.add_argument('--val_percentile', type=float, default=99.9, help='Percentile for val_max threshold')
     parser.add_argument('--mean_std_k', type=float, default=3.0, help='k for mean+k*std threshold (default 3.0)')
-    parser.add_argument('--combine_mode', type=str, default='average', choices=['average', 'boost'],
+    parser.add_argument('--combine_mode', type=str, default='average', choices=['average', 'boost', 'gated_boost'],
                         help='How to combine heatmaps: average (weighted avg) or boost (CPR boosts INP)')
     # Smoothing options
     parser.add_argument('--bilateral', action='store_true', help='Apply bilateral filter to combined heatmap')

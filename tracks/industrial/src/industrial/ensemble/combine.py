@@ -121,7 +121,8 @@ def combine_heatmaps(inp_dir, cpr_dir, fname, save_size, inp_weight, cpr_weight,
     """Load and combine INP-Former + CPR heatmaps for a single image.
 
     Args:
-        combine_mode: 'average' (weighted average) or 'boost' (CPR boosts INP signal)
+        combine_mode: 'average' (weighted average), 'boost' (CPR boosts INP),
+                      or 'gated_boost' (CPR boosts INP only where CPR is confident)
 
     Returns the combined heatmap, or None if INP heatmap not found.
     """
@@ -158,6 +159,9 @@ def combine_heatmaps(inp_dir, cpr_dir, fname, save_size, inp_weight, cpr_weight,
 
         if combine_mode == 'boost':
             combined = inp_val * (1 + cpr_weight * cpr_val ** cpr_power)
+        elif combine_mode == 'gated_boost':
+            gate = (cpr_val > np.percentile(cpr_val, 95)).astype(np.float32)
+            combined = inp_val * (1 + cpr_weight * cpr_val ** cpr_power * gate)
         else:
             combined = (inp_weight * inp_val + cpr_weight * cpr_val) / (inp_weight + cpr_weight)
         return combined, True

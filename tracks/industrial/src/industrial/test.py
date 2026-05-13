@@ -24,7 +24,7 @@ def main() -> None:
     parser.add_argument('--evt_fdr', type=float, default=0.01)
     parser.add_argument('--val_percentile', type=float, default=99.9)
     parser.add_argument('--mean_std_k', type=float, default=3.0, help='k for mean+k*std threshold')
-    parser.add_argument('--combine_mode', type=str, default='average', choices=['average', 'boost'],
+    parser.add_argument('--combine_mode', type=str, default='average', choices=['average', 'boost', 'gated_boost'],
                         help='How to combine heatmaps: average or boost (CPR boosts INP)')
     # INP-Former args
     parser.add_argument('--inp_save_dir', type=str, default=None, help='INP-Former weights dir (default: {out_dir}/inp_former)')
