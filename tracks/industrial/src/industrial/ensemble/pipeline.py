@@ -62,7 +62,8 @@ def run_ensemble(args):
     cpr_weights_per_cat = {}
     if auto_cpr and args.inp_val_dir:
         print("Computing auto CPR weights from INP SNR...")
-        cpr_weights_per_cat = compute_auto_cpr_weights(args.inp_val_dir, args.cpr_val_dir, categories, save_size)
+        ec_multiplier = getattr(args, 'ec_multiplier', 1.0)
+        cpr_weights_per_cat = compute_auto_cpr_weights(args.inp_val_dir, args.cpr_val_dir, categories, save_size, ec_multiplier=ec_multiplier)
 
     # Compute spatial prior if requested
     spatial_prior = getattr(args, 'spatial_prior', False)
@@ -237,6 +238,13 @@ def run_ensemble(args):
                 else:
                     pred_mask = _otsu_fallback(combined)
 
+                # Morphological closing (smooth edges, fill gaps)
+                morph_close = getattr(args, 'morph_close', False)
+                if morph_close:
+                    morph_size = getattr(args, 'morph_size', 3)
+                    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (morph_size, morph_size))
+                    pred_mask = cv2.morphologyEx(pred_mask, cv2.MORPH_CLOSE, kernel)
+
                 # Save binary PNG (submission format)
                 cv2.imwrite(os.path.join(thresh_out, f'{fname}.png'), pred_mask)
 
@@ -302,7 +310,10 @@ def main():
     parser.add_argument('--median_sub', action='store_true', help='Subtract per-image median before thresholding')
     parser.add_argument('--val_image_dir', type=str, default=None, help='Validation images dir (for guided filter during EVT fitting)')
     # Auto CPR weight
-    parser.add_argument('--auto_cpr_weight', action='store_true', help='Auto-compute per-category CPR weight from INP SNR')
+    parser.add_argument('--auto_cpr_weight', action='store_true', help='Auto-compute per-category CPR weight from EdgeCorr')
+    parser.add_argument('--ec_multiplier', type=float, default=1.0, help='Multiplier for EdgeCorr weights (default 1.0)')
+    parser.add_argument('--morph_close', action='store_true', help='Apply morphological closing to binary mask')
+    parser.add_argument('--morph_size', type=int, default=3, help='Kernel size for morphological closing (default 3)')
     parser.add_argument('--cpr_power', type=float, default=1.0, help='Power applied to CPR signal in boost mode (default 1.0, >1 sharpens)')
     parser.add_argument('--spatial_prior', action='store_true', help='Apply spatial FP suppression from validation')
     parser.add_argument('--grid_size', type=int, default=4, help='Grid size for spatial prior (default 4)')

@@ -43,8 +43,8 @@ def _gradient_correlation(map1, map2, size):
     return corr if not np.isnan(corr) else 0.0
 
 
-def compute_auto_cpr_weights(inp_val_dir, cpr_val_dir, categories, save_size):
-    """Compute per-category CPR weight based on edge correlation: max(0, EdgeCorr - 0.1) * 1.15."""
+def compute_auto_cpr_weights(inp_val_dir, cpr_val_dir, categories, save_size, ec_multiplier=1.0):
+    """Compute per-category CPR weight based on edge correlation scaled by ec_multiplier."""
     weights = {}
     for category in categories:
         inp_good = os.path.join(inp_val_dir, category, 'good')
@@ -73,7 +73,7 @@ def compute_auto_cpr_weights(inp_val_dir, cpr_val_dir, categories, save_size):
 
         if edge_corrs:
             mean_ec = np.mean(edge_corrs)
-            w = max(0.0, mean_ec)
+            w = max(0.0, mean_ec * ec_multiplier)
             weights[category] = w
             print(f"  {category}: EdgeCorr={mean_ec:.4f}, cpr_weight={w:.3f}")
         else:

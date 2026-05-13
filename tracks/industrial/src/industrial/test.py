@@ -52,7 +52,10 @@ def main() -> None:
     parser.add_argument('--median_sub', action='store_true', help='Subtract per-image median')
     parser.add_argument('--val_image_dir', type=str, default=None, help='Validation images dir (for guided filter during EVT fitting)')
     # Auto CPR weight
-    parser.add_argument('--auto_cpr_weight', action='store_true', help='Auto-compute per-category CPR weight from INP SNR')
+    parser.add_argument('--auto_cpr_weight', action='store_true', help='Auto-compute per-category CPR weight from EdgeCorr')
+    parser.add_argument('--ec_multiplier', type=float, default=1.0, help='Multiplier for EdgeCorr weights')
+    parser.add_argument('--morph_close', action='store_true', help='Apply morphological closing to binary mask')
+    parser.add_argument('--morph_size', type=int, default=3, help='Kernel size for morphological closing')
     parser.add_argument('--cpr_power', type=float, default=1.0, help='Power for CPR signal in boost mode')
     parser.add_argument('--spatial_prior', action='store_true', help='Apply spatial FP suppression')
     parser.add_argument('--grid_size', type=int, default=4, help='Grid size for spatial prior')
@@ -166,6 +169,9 @@ def main() -> None:
         ens.median_sub = args.median_sub
         ens.val_image_dir = args.val_image_dir
         ens.auto_cpr_weight = args.auto_cpr_weight
+        ens.ec_multiplier = args.ec_multiplier
+        ens.morph_close = args.morph_close
+        ens.morph_size = args.morph_size
         ens.cpr_power = args.cpr_power
         ens.spatial_prior = args.spatial_prior
         ens.grid_size = args.grid_size
