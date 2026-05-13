@@ -391,7 +391,7 @@ def test_one_category(args, item, data_transform, gt_transform, device, use_tili
                         top_percent=args.top_percent)
         print_fn(f'{item}: scores saved')
 
-    return results
+    return results if has_gt else None
 
 
 def validate_one_category(args, item, data_transform, device, use_tiling, tile_overlap):
@@ -516,7 +516,8 @@ def main(args):
             all_results.append(results)
         elif args.phase == 'test':
             results = test_one_category(args, item, data_transform, gt_transform, device, use_tiling, tile_overlap, embed_dim)
-            all_results.append(results)
+            if results is not None:
+                all_results.append(results)
         elif args.phase == 'validation':
             validate_one_category(args, item, data_transform, device, use_tiling, tile_overlap)
 
