@@ -59,6 +59,7 @@ def save_heatmaps(model, dataloader, device, save_dir, item, crop_size, seg_head
                 os.makedirs(out_dir, exist_ok=True)
                 input_img = denormalize(img[i].cpu().numpy())
                 raw_amap = anomaly_map[i, 0].cpu().numpy()
+                raw_amap = cv2.resize(raw_amap, (512, 512)).astype(np.float16)
                 np.save(os.path.join(out_dir, f'{fname}_heatmap_raw.npy'), raw_amap)
                 amap = (raw_amap - raw_amap.min()) / (raw_amap.max() - raw_amap.min() + 1e-8)
                 plt.imsave(os.path.join(out_dir, f'{fname}_input.png'), input_img)
@@ -116,14 +117,14 @@ def save_heatmaps_tiled(model, dataloader, device, save_dir, item, crop_size, to
         mx, my = data['margin_x'], data['margin_y']
         amap = stitch_tiles(data['maps'], data['h'], data['w'], data['tile_h'], data['tile_w'], data['positions'], mx, my)
 
-        # Resize to save size before saving (keep full-res for metrics)
+        # Resize to 512 and save as float16
         save_size = 512
-        amap_save = cv2.resize(amap, (save_size, save_size))
-        amap_save = (amap_save - amap_save.min()) / (amap_save.max() - amap_save.min() + 1e-8)
+        amap_resized = cv2.resize(amap, (save_size, save_size))
+        amap_save = (amap_resized - amap_resized.min()) / (amap_resized.max() - amap_resized.min() + 1e-8)
 
         # Save heatmap
         plt.imsave(os.path.join(out_dir, f'{fname}_heatmap.png'), amap_save, cmap='jet')
-        np.save(os.path.join(out_dir, f'{fname}_heatmap_raw.npy'), amap)
+        np.save(os.path.join(out_dir, f'{fname}_heatmap_raw.npy'), amap_resized.astype(np.float16))
 
         if data['label'] == 1:
             # Load original GT — check AD 2 layout then AD 1

@@ -182,7 +182,7 @@ def test(model: CPR, train_fns, test_fns, retrieval_result, foreground_result, r
                 input_img = cv.cvtColor(input_img, cv.COLOR_BGR2RGB)
                 plt.imsave(os.path.join(out_dir, f'{image_name}_input.png'), input_img)
                 plt.imsave(os.path.join(out_dir, f'{image_name}_heatmap.png'), amap_norm, cmap='jet')
-                np.save(os.path.join(out_dir, f'{image_name}_heatmap_raw.npy'), amap)
+                np.save(os.path.join(out_dir, f'{image_name}_heatmap_raw.npy'), cv.resize(amap, (512, 512)).astype(np.float16))
 
                 amap_color = (plt.cm.jet(amap_norm)[:, :, :3] * 255).astype(np.uint8)
                 overlay = cv.addWeighted(input_img, 0.5, amap_color, 0.5, 0)
