@@ -53,6 +53,7 @@ def main() -> None:
     parser.add_argument('--val_image_dir', type=str, default=None, help='Validation images dir (for guided filter during EVT fitting)')
     # Auto CPR weight
     parser.add_argument('--auto_cpr_weight', action='store_true', help='Auto-compute per-category CPR weight from INP SNR')
+    parser.add_argument('--cpr_power', type=float, default=1.0, help='Power for CPR signal in boost mode')
 
     args = parser.parse_args()
 
@@ -162,6 +163,7 @@ def main() -> None:
         ens.median_sub = args.median_sub
         ens.val_image_dir = args.val_image_dir
         ens.auto_cpr_weight = args.auto_cpr_weight
+        ens.cpr_power = args.cpr_power
 
         run_ensemble(ens)
 

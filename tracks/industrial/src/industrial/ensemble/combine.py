@@ -56,7 +56,7 @@ def compute_auto_cpr_weights(inp_val_dir, categories, save_size):
     return weights
 
 
-def combine_heatmaps(inp_dir, cpr_dir, fname, save_size, inp_weight, cpr_weight, global_stats=None, combine_mode='average'):
+def combine_heatmaps(inp_dir, cpr_dir, fname, save_size, inp_weight, cpr_weight, global_stats=None, combine_mode='average', cpr_power=1.0):
     """Load and combine INP-Former + CPR heatmaps for a single image.
 
     Args:
@@ -96,7 +96,7 @@ def combine_heatmaps(inp_dir, cpr_dir, fname, save_size, inp_weight, cpr_weight,
             cpr_val = normalize_map(cpr_resized)
 
         if combine_mode == 'boost':
-            combined = inp_val * (1 + cpr_weight * cpr_val)
+            combined = inp_val * (1 + cpr_weight * cpr_val ** cpr_power)
         else:
             combined = (inp_weight * inp_val + cpr_weight * cpr_val) / (inp_weight + cpr_weight)
         return combined, True
@@ -167,7 +167,7 @@ def _find_val_image(val_dir, category, fname):
 
 
 def fit_evt_from_validation(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, cpr_weight,
-                            global_stats=None, combine_mode='average', post_process_args=None, val_image_dir=None):
+                            global_stats=None, combine_mode='average', post_process_args=None, val_image_dir=None, cpr_power=1.0):
     """Fit GEV distribution on combined validation/good heatmaps for a category."""
     inp_val_good = os.path.join(inp_val_dir, category, 'good')
     cpr_val_good = os.path.join(cpr_val_dir, category, 'good')
@@ -182,7 +182,7 @@ def fit_evt_from_validation(inp_val_dir, cpr_val_dir, category, save_size, inp_w
     all_pixel_scores = []
     for npy_path in inp_npy_files:
         fname = os.path.basename(npy_path).replace('_heatmap_raw.npy', '')
-        combined, _ = combine_heatmaps(inp_val_good, cpr_val_good, fname, save_size, inp_weight, cpr_weight, global_stats=global_stats, combine_mode=combine_mode)
+        combined, _ = combine_heatmaps(inp_val_good, cpr_val_good, fname, save_size, inp_weight, cpr_weight, global_stats=global_stats, combine_mode=combine_mode, cpr_power=cpr_power)
         if combined is not None:
             # Apply same post-processing as test
             guide_img = None
@@ -221,7 +221,7 @@ def absolute_threshold(combined_map, val_max):
 
 
 def compute_mean_std_from_validation(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, cpr_weight,
-                                     global_stats=None, combine_mode='average', post_process_args=None, val_image_dir=None):
+                                     global_stats=None, combine_mode='average', post_process_args=None, val_image_dir=None, cpr_power=1.0):
     """Compute mean and std of combined validation scores for a category."""
     inp_val_good = os.path.join(inp_val_dir, category, 'good')
     cpr_val_good = os.path.join(cpr_val_dir, category, 'good')
@@ -236,7 +236,7 @@ def compute_mean_std_from_validation(inp_val_dir, cpr_val_dir, category, save_si
     all_pixel_scores = []
     for npy_path in inp_npy_files:
         fname = os.path.basename(npy_path).replace('_heatmap_raw.npy', '')
-        combined, _ = combine_heatmaps(inp_val_good, cpr_val_good, fname, save_size, inp_weight, cpr_weight, global_stats=global_stats, combine_mode=combine_mode)
+        combined, _ = combine_heatmaps(inp_val_good, cpr_val_good, fname, save_size, inp_weight, cpr_weight, global_stats=global_stats, combine_mode=combine_mode, cpr_power=cpr_power)
         if combined is not None:
             guide_img = None
             if pp.get('guided') and val_image_dir:
@@ -265,7 +265,7 @@ def mean_std_threshold(combined_map, mean_std_params, k=3.0):
 
 
 def compute_val_max(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, cpr_weight,
-                    global_stats=None, percentile=99.9, combine_mode='average', post_process_args=None, val_image_dir=None):
+                    global_stats=None, percentile=99.9, combine_mode='average', post_process_args=None, val_image_dir=None, cpr_power=1.0):
     """Compute the near-max of validation combined scores for a category."""
     inp_val_good = os.path.join(inp_val_dir, category, 'good')
     cpr_val_good = os.path.join(cpr_val_dir, category, 'good')
@@ -276,7 +276,7 @@ def compute_val_max(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, c
     all_pixel_scores = []
     for npy_path in inp_npy_files:
         fname = os.path.basename(npy_path).replace('_heatmap_raw.npy', '')
-        combined, _ = combine_heatmaps(inp_val_good, cpr_val_good, fname, save_size, inp_weight, cpr_weight, global_stats=global_stats, combine_mode=combine_mode)
+        combined, _ = combine_heatmaps(inp_val_good, cpr_val_good, fname, save_size, inp_weight, cpr_weight, global_stats=global_stats, combine_mode=combine_mode, cpr_power=cpr_power)
         if combined is not None:
             guide_img = None
             if pp.get('guided') and val_image_dir:

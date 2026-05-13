@@ -39,6 +39,7 @@ def run_ensemble(args):
     save_size = args.save_size
     combine_mode = getattr(args, 'combine_mode', 'average')
     median_sub = getattr(args, 'median_sub', False)
+    cpr_power = getattr(args, 'cpr_power', 1.0)
 
     # Build post-processing args dict (shared between validation and test)
     pp_args = {
@@ -79,7 +80,7 @@ def run_ensemble(args):
                 params = fit_evt_from_validation(
                     args.inp_val_dir, args.cpr_val_dir, category,
                     save_size, args.inp_weight, cat_cpr_weight, global_stats=global_stats,
-                    combine_mode=combine_mode, post_process_args=pp_args, val_image_dir=val_image_dir)
+                    combine_mode=combine_mode, post_process_args=pp_args, val_image_dir=val_image_dir, cpr_power=cpr_power)
                 if params is not None:
                     evt_params_per_cat[category] = params
             # Compute per-category FDR
@@ -111,7 +112,7 @@ def run_ensemble(args):
                     args.inp_val_dir, args.cpr_val_dir, category,
                     save_size, args.inp_weight, cat_cpr_weight,
                     global_stats=global_stats, percentile=args.val_percentile,
-                    combine_mode=combine_mode, post_process_args=pp_args, val_image_dir=val_image_dir)
+                    combine_mode=combine_mode, post_process_args=pp_args, val_image_dir=val_image_dir, cpr_power=cpr_power)
                 if val_max is not None:
                     val_maxes[category] = val_max
             thresholds_per_cat = {'method': 'val_max', 'thresholds': val_maxes}
@@ -126,7 +127,7 @@ def run_ensemble(args):
                     args.inp_val_dir, args.cpr_val_dir, category,
                     save_size, args.inp_weight, cat_cpr_weight,
                     global_stats=global_stats, combine_mode=combine_mode,
-                    post_process_args=pp_args, val_image_dir=val_image_dir)
+                    post_process_args=pp_args, val_image_dir=val_image_dir, cpr_power=cpr_power)
                 if params is not None:
                     mean_std_per_cat[category] = params
             thresholds_per_cat = {'method': 'mean_std', 'params': mean_std_per_cat, 'k': k}
@@ -163,7 +164,7 @@ def run_ensemble(args):
 
                 combined, was_combined = combine_heatmaps(
                     inp_sub, cpr_sub, fname, save_size, args.inp_weight, cat_cpr_weight,
-                    global_stats=global_stats, combine_mode=combine_mode)
+                    global_stats=global_stats, combine_mode=combine_mode, cpr_power=cpr_power)
                 if combined is None:
                     continue
                 if was_combined:
@@ -285,6 +286,7 @@ def main():
     parser.add_argument('--val_image_dir', type=str, default=None, help='Validation images dir (for guided filter during EVT fitting)')
     # Auto CPR weight
     parser.add_argument('--auto_cpr_weight', action='store_true', help='Auto-compute per-category CPR weight from INP SNR')
+    parser.add_argument('--cpr_power', type=float, default=1.0, help='Power applied to CPR signal in boost mode (default 1.0, >1 sharpens)')
 
     args = parser.parse_args()
     run_ensemble(args)
