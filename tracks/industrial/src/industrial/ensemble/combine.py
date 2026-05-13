@@ -56,6 +56,68 @@ def compute_auto_cpr_weights(inp_val_dir, categories, save_size):
     return weights
 
 
+def compute_spatial_prior(inp_val_dir, cpr_val_dir, categories, save_size, inp_weight, cpr_weight_map,
+                          global_stats=None, combine_mode='average', cpr_power=1.0, grid_size=4):
+    """Build per-category spatial suppression maps from validation heatmaps.
+
+    For each category, divides the heatmap into a grid and computes the mean
+    anomaly score per cell across all validation images. High-scoring cells
+    are areas prone to false positives. Returns a dict of suppression maps
+    (lower values = more suppression)."""
+    priors = {}
+    cell_h = save_size // grid_size
+    cell_w = save_size // grid_size
+
+    for category in categories:
+        inp_good = os.path.join(inp_val_dir, category, 'good')
+        cpr_good = os.path.join(cpr_val_dir, category, 'good')
+        if not os.path.isdir(inp_good):
+            continue
+
+        cat_cpr_weight = cpr_weight_map.get(category, 1.0)
+        grid_sums = np.zeros((grid_size, grid_size), dtype=np.float64)
+        n_images = 0
+
+        for npy_path in sorted(glob(os.path.join(inp_good, '*_heatmap_raw.npy'))):
+            fname = os.path.basename(npy_path).replace('_heatmap_raw.npy', '')
+            combined, _ = combine_heatmaps(inp_good, cpr_good, fname, save_size,
+                                           inp_weight, cat_cpr_weight,
+                                           global_stats=global_stats,
+                                           combine_mode=combine_mode, cpr_power=cpr_power)
+            if combined is None:
+                continue
+            for r in range(grid_size):
+                for c in range(grid_size):
+                    cell = combined[r*cell_h:(r+1)*cell_h, c*cell_w:(c+1)*cell_w]
+                    grid_sums[r, c] += cell.mean()
+            n_images += 1
+
+        if n_images == 0:
+            continue
+
+        grid_means = grid_sums / n_images
+        # Invert: high mean → low weight (suppress FP areas)
+        # Scale so min cell gets weight 1.0, max cell gets lower weight
+        gmax = grid_means.max()
+        gmin = grid_means.min()
+        if gmax - gmin > 1e-8:
+            # Normalize to [0, 1] where 0 = highest FP area, 1 = lowest
+            grid_weights = 1.0 - (grid_means - gmin) / (gmax - gmin)
+            # Scale to [suppress_floor, 1.0] so we don't fully zero out any region
+            suppress_floor = 0.3
+            grid_weights = suppress_floor + grid_weights * (1.0 - suppress_floor)
+        else:
+            grid_weights = np.ones((grid_size, grid_size))
+
+        # Upscale to full resolution with smooth interpolation
+        prior_map = cv2.resize(grid_weights.astype(np.float32), (save_size, save_size),
+                               interpolation=cv2.INTER_LINEAR)
+        priors[category] = prior_map
+        print(f"  {category}: spatial prior grid (min={grid_weights.min():.3f}, max={grid_weights.max():.3f})")
+
+    return priors
+
+
 def combine_heatmaps(inp_dir, cpr_dir, fname, save_size, inp_weight, cpr_weight, global_stats=None, combine_mode='average', cpr_power=1.0):
     """Load and combine INP-Former + CPR heatmaps for a single image.
 

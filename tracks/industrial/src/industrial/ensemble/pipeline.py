@@ -20,6 +20,7 @@ from industrial.ensemble.combine import (
     combine_heatmaps,
     compute_auto_cpr_weights,
     compute_global_stats,
+    compute_spatial_prior,
     fit_evt_from_validation,
     evt_threshold,
     post_process_heatmap,
@@ -62,6 +63,17 @@ def run_ensemble(args):
     if auto_cpr and args.inp_val_dir:
         print("Computing auto CPR weights from INP SNR...")
         cpr_weights_per_cat = compute_auto_cpr_weights(args.inp_val_dir, categories, save_size)
+
+    # Compute spatial prior if requested
+    spatial_prior = getattr(args, 'spatial_prior', False)
+    spatial_priors_per_cat = {}
+    if spatial_prior and args.inp_val_dir and args.cpr_val_dir:
+        grid_size = getattr(args, 'grid_size', 4)
+        print(f"Computing spatial priors ({grid_size}x{grid_size} grid)...")
+        spatial_priors_per_cat = compute_spatial_prior(
+            args.inp_val_dir, args.cpr_val_dir, categories, save_size,
+            args.inp_weight, cpr_weights_per_cat if cpr_weights_per_cat else {c: args.cpr_weight for c in categories},
+            combine_mode=combine_mode, cpr_power=cpr_power, grid_size=grid_size)
 
     # Compute global stats and fit threshold from validation
     global_stats = None
@@ -184,6 +196,10 @@ def run_ensemble(args):
                             break
                 combined = post_process_heatmap(combined, guide_img=guide_img, **pp_args)
 
+                # Apply spatial prior (suppress FP-prone regions)
+                if category in spatial_priors_per_cat:
+                    combined = combined * spatial_priors_per_cat[category]
+
                 # Save heatmap visualization
                 plt.imsave(os.path.join(heatmap_out, f'{fname}_heatmap.png'), combined, cmap='jet')
 
@@ -287,6 +303,8 @@ def main():
     # Auto CPR weight
     parser.add_argument('--auto_cpr_weight', action='store_true', help='Auto-compute per-category CPR weight from INP SNR')
     parser.add_argument('--cpr_power', type=float, default=1.0, help='Power applied to CPR signal in boost mode (default 1.0, >1 sharpens)')
+    parser.add_argument('--spatial_prior', action='store_true', help='Apply spatial FP suppression from validation')
+    parser.add_argument('--grid_size', type=int, default=4, help='Grid size for spatial prior (default 4)')
 
     args = parser.parse_args()
     run_ensemble(args)

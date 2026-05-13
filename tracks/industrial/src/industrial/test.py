@@ -54,6 +54,8 @@ def main() -> None:
     # Auto CPR weight
     parser.add_argument('--auto_cpr_weight', action='store_true', help='Auto-compute per-category CPR weight from INP SNR')
     parser.add_argument('--cpr_power', type=float, default=1.0, help='Power for CPR signal in boost mode')
+    parser.add_argument('--spatial_prior', action='store_true', help='Apply spatial FP suppression')
+    parser.add_argument('--grid_size', type=int, default=4, help='Grid size for spatial prior')
 
     args = parser.parse_args()
 
@@ -164,6 +166,8 @@ def main() -> None:
         ens.val_image_dir = args.val_image_dir
         ens.auto_cpr_weight = args.auto_cpr_weight
         ens.cpr_power = args.cpr_power
+        ens.spatial_prior = args.spatial_prior
+        ens.grid_size = args.grid_size
 
         run_ensemble(ens)
 
