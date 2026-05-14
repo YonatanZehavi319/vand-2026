@@ -61,7 +61,7 @@ def run_ensemble(args):
     auto_cpr = getattr(args, 'auto_cpr_weight', False)
     cpr_weights_per_cat = {}
     if auto_cpr and args.inp_val_dir:
-        print("Computing auto CPR weights from INP SNR...")
+        print("Computing auto CPR weights from EdgeCorr...")
         ec_multiplier = getattr(args, 'ec_multiplier', 1.0)
         cpr_weights_per_cat = compute_auto_cpr_weights(args.inp_val_dir, args.cpr_val_dir, categories, save_size, ec_multiplier=ec_multiplier)
 
