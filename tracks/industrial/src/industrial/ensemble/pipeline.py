@@ -94,7 +94,8 @@ def run_ensemble(args):
                 params = fit_evt_from_validation(
                     args.inp_val_dir, args.cpr_val_dir, category,
                     save_size, args.inp_weight, cat_cpr_weight, global_stats=global_stats,
-                    combine_mode=combine_mode, post_process_args=pp_args, val_image_dir=val_image_dir, cpr_power=cpr_power)
+                    combine_mode=combine_mode, post_process_args=pp_args, val_image_dir=val_image_dir, cpr_power=cpr_power,
+                    evt_tail_pct=getattr(args, 'evt_tail_pct', 95))
                 if params is not None:
                     evt_params_per_cat[category] = params
             # Compute per-category FDR
@@ -295,6 +296,7 @@ def main():
     parser.add_argument('--threshold_method', type=str, default='evt', choices=['evt', 'val_max', 'otsu', 'mean_std'])
     parser.add_argument('--evt_fdr', type=float, default=0.01)
     parser.add_argument('--val_percentile', type=float, default=99.9, help='Percentile for val_max threshold')
+    parser.add_argument('--evt_tail_pct', type=float, default=95, help='Percentile for EVT tail selection (default 95)')
     parser.add_argument('--mean_std_k', type=float, default=3.0, help='k for mean+k*std threshold (default 3.0)')
     parser.add_argument('--combine_mode', type=str, default='average', choices=['average', 'boost', 'gated_boost'],
                         help='How to combine heatmaps: average (weighted avg) or boost (CPR boosts INP)')

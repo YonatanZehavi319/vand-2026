@@ -23,6 +23,7 @@ def main() -> None:
     parser.add_argument('--threshold_method', type=str, default='evt', choices=['evt', 'val_max', 'otsu', 'mean_std'])
     parser.add_argument('--evt_fdr', type=float, default=0.05)
     parser.add_argument('--val_percentile', type=float, default=99.9)
+    parser.add_argument('--evt_tail_pct', type=float, default=95, help='Percentile for EVT tail selection')
     parser.add_argument('--mean_std_k', type=float, default=3.0, help='k for mean+k*std threshold')
     parser.add_argument('--combine_mode', type=str, default='gated_boost', choices=['average', 'boost', 'gated_boost'],
                         help='How to combine heatmaps (default: gated_boost)')
@@ -159,6 +160,7 @@ def main() -> None:
         ens.threshold_method = args.threshold_method
         ens.evt_fdr = args.evt_fdr
         ens.val_percentile = args.val_percentile
+        ens.evt_tail_pct = args.evt_tail_pct
         ens.mean_std_k = args.mean_std_k
         ens.combine_mode = args.combine_mode
         ens.bilateral = args.bilateral

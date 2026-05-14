@@ -259,7 +259,7 @@ def _find_val_image(val_dir, category, fname):
 
 
 def fit_evt_from_validation(inp_val_dir, cpr_val_dir, category, save_size, inp_weight, cpr_weight,
-                            global_stats=None, combine_mode='average', post_process_args=None, val_image_dir=None, cpr_power=1.0):
+                            global_stats=None, combine_mode='average', post_process_args=None, val_image_dir=None, cpr_power=1.0, evt_tail_pct=95):
     """Fit GEV distribution on combined validation/good heatmaps for a category."""
     inp_val_good = os.path.join(inp_val_dir, category, 'good')
     cpr_val_good = os.path.join(cpr_val_dir, category, 'good')
@@ -290,7 +290,7 @@ def fit_evt_from_validation(inp_val_dir, cpr_val_dir, category, save_size, inp_w
         return None
 
     all_pixel_scores = np.concatenate(all_pixel_scores)
-    tail_threshold = np.percentile(all_pixel_scores, 95)
+    tail_threshold = np.percentile(all_pixel_scores, evt_tail_pct)
     tail_scores = all_pixel_scores[all_pixel_scores >= tail_threshold]
     if len(tail_scores) > 500000:
         tail_scores = np.random.choice(tail_scores, 500000, replace=False)
