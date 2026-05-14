@@ -1,113 +1,173 @@
-# VAND 4.0 Challenge @ CVPR 2026
+# VAND 2026 Industrial Track — Gated Boost Ensemble
 
-Participant scaffold for the **Visual Anomaly and Novelty Detection (VAND) 4.0 Challenge** at CVPR 2026.
+Anomaly detection and segmentation on MVTec AD 2, combining **INP-Former** and **CPR** with a gated boost ensemble strategy.
 
-Two competition tracks:
+**Team:** Yonatan Zehavi — Hebrew University of Jerusalem
 
-| Track          | Dataset    | Task                             | Metric | Submission                                                   |
-| -------------- | ---------- | -------------------------------- | ------ | ------------------------------------------------------------ |
-| **Industrial** | MVTec AD 2 | Pixel-level anomaly segmentation | SegF1  | tar.gz → [benchmark.mvtec.com](https://benchmark.mvtec.com/) |
-| **Retail**     | Kaputt 2   | Image-level defect scoring       | AP_any | CSV zip → [Codabench](https://www.codabench.org/)            |
+## Method Summary
 
-## Repository Structure
+- **INP-Former**: Reconstruction-based anomaly detection with DINOv2 encoder and Intrinsic Normal Prototypes, using overlapping tiling for high-resolution images.
+- **CPR**: Cascade Patch Retrieval with DenseNet201 backbone for fine-grained patch-level anomaly localization.
+- **Ensemble**: Gated boost — CPR selectively amplifies INP-Former's signal only where CPR is confident (top 5% pixels). Per-category CPR weight is automatically derived from edge correlation between models on validation data.
+- **Threshold**: Extreme Value Theory (GEV) fitted on combined validation heatmaps.
+- **Post-processing**: Guided filter using original image as reference for edge-aware smoothing.
 
-```
-vand-2026/
-├── pyproject.toml             # UV workspace root
-├── tracks/                    # Participant stubs — implement your model here
-│   ├── industrial/            # Model skeleton + train/test/submit entrypoints
-│   │   ├── pyproject.toml     # vand-industrial package
-│   │   └── src/industrial/
-│   │       ├── model.py       # ← Implement your anomaly segmentation model
-│   │       ├── train.py       # Training entrypoint
-│   │       ├── test.py        # Inference entrypoint
-│   │       └── submit.py      # Submission packaging
-│   └── retail/                # Model skeleton + train/test/submit entrypoints
-│       ├── pyproject.toml     # vand-retail package
-│       └── src/retail/
-│           ├── model.py       # ← Implement your defect detection model
-│           ├── train.py       # Training entrypoint
-│           ├── test.py        # Inference entrypoint
-│           └── submit.py      # Submission packaging
-│
-└── utils/                     # Shared helper utilities (dataloaders, evaluation, submission)
-    ├── pyproject.toml         # vand-utils package
-    ├── industrial/            # MVTec AD 2 dataset, SegF1 evaluation, tar.gz packaging
-    ├── retail/                # Kaputt 2 dataset, AP evaluation, CSV packaging
-    └── auto_batch.py          # Auto batch-size fitting decorator
-```
-
-The three packages (`vand-utils`, `vand-retail`, `vand-industrial`) form a
-[UV workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/).
-Track packages depend on `vand-utils`; the `retail` and `industrial` namespaces
-are shared across utils and tracks via implicit namespace packages.
-
-## Prerequisites
-
-- Python ≥ 3.11
-- [uv](https://docs.astral.sh/uv/getting-started/installation/)
-
-## Quick Start
-
-### 1. Install
+## Setup
 
 ```bash
-uv sync --all-packages
+# Clone and install
+git clone https://github.com/YonatanZehavi319/vand-2026.git
+cd vand-2026
+pip install -e tracks/industrial/ -e utils/
+
+# Additional dependencies
+pip install matplotlib numpy==1.26.4 opencv-contrib-python
 ```
 
-This installs all workspace packages (`vand-utils`, `vand-retail`,
-`vand-industrial`) and their dependencies into a single virtual environment.
+## Download Weights
 
-### 2. Download data
-
-- **Industrial**: Download MVTec AD 2 from [mvtec.com](https://www.mvtec.com/company/research/datasets/mvtec-ad-2)
-- **Retail**: Download Kaputt from [kaputt-dataset.com](https://www.kaputt-dataset.com/) and Kaputt 2 from [kaputt-dataset.com/kaputt2](https://www.kaputt-dataset.com/kaputt2)
-
-### 3. Pick your track
-
-- **Retail Track** — see [`tracks/retail/README.md`](tracks/retail/README.md)
-- **Industrial Track** — see [`tracks/industrial/README.md`](tracks/industrial/README.md)
-
-## End-to-End Examples
-
-### Retail Track
+Download from [GitHub Releases](https://github.com/YonatanZehavi319/vand-2026/releases/tag/v1.0):
 
 ```bash
-# Train your model
-uv run train-retail
+# INP-Former weights (split into 2 parts)
+cat inp_weights_part_aa inp_weights_part_ab > inp_weights.tar.gz
+mkdir -p weights/INP-Former-Multi-Class_dataset=MVTec-AD_Encoder=dinov2reg_vit_base_14_Resize=448_Crop=392_INP_num=6
+tar xzf inp_weights.tar.gz -C weights/INP-Former-Multi-Class_dataset=MVTec-AD_Encoder=dinov2reg_vit_base_14_Resize=448_Crop=392_INP_num=6/
 
-# Run inference → writes predictions.csv
-uv run test-retail
-
-# Package CSV into a submission zip
-uv run submit-retail package predictions.csv
-
-# Validate an existing submission zip against ground truth
-uv run submit-retail validate predictions.zip --ground-truth query-test.parquet
+# CPR weights
+tar xzf cpr_weights.tar.gz -C log/mvtec_train_v2/
 ```
 
-Upload `predictions.zip` to [Codabench](https://www.codabench.org/).
+## Dataset
 
-### Industrial Track
+Download MVTec AD 2 from [mvtec.com](https://www.mvtec.com/company/research/datasets/mvtec-ad-2) and extract to `/workspace/mvtec/`.
+
+CPR also requires:
+- Foreground masks: `log/foreground/`
+- Retrieval index: `log/retrieval_mvtec_DenseNet_features.denseblock1_320/`
+- Synthetic data: `log/synthetic_mvtec_320_6000_True_jpg/`
+
+These are generated during CPR preprocessing (see Training section).
+
+## Reproduce Submission
+
+### 1. Run Validation (for threshold fitting)
 
 ```bash
-# Train your model
-uv run train-industrial
+# INP-Former validation (non-augmented)
+python -m industrial.train --model inp --phase validation \
+    --data_path /workspace/mvtec --save_dir weights \
+    --tiling --target_tile 600 --batch_size 4
 
-# Run inference → writes prediction maps to output/
-uv run test-industrial
-
-# Package predictions into a submission archive
-uv run submit-industrial
+# CPR validation
+python -m industrial.train --model cpr --phase validation \
+    --data-root /workspace/mvtec --save-dir ./output/cpr \
+    --checkpoints "log/mvtec_train_v2/{category}/03000.pth"
 ```
 
-Upload the resulting `submission.tar.gz` to [benchmark.mvtec.com](https://benchmark.mvtec.com/).
+### 2. Run Inference on Private Test Splits
 
-## Local Evaluation Disclaimer
+```bash
+# test_private
+python -m industrial.test \
+    --data_dir /workspace/mvtec \
+    --out_dir ./output_submit \
+    --split test_private \
+    --inp_save_dir weights \
+    --tiling --target_tile 600 --batch_size 4 \
+    --cpr_checkpoints "log/mvtec_train_v2/{category}/03000.pth" \
+    --combine_mode gated_boost \
+    --auto_cpr_weight \
+    --guided --guided_eps 0.001 \
+    --evt_fdr 0.05 --cpr_power 1.5 \
+    --inp_val_dir "weights/INP-Former-Multi-Class_dataset=MVTec-AD_Encoder=dinov2reg_vit_base_14_Resize=448_Crop=392_INP_num=6/val_heatmaps" \
+    --cpr_val_dir output/cpr/val_heatmaps
 
-The evaluation utilities in `utils/industrial/evaluate.py` and `utils/retail/evaluate.py` are provided **for convenience and local testing only**. Official scores are computed by the respective challenge servers, whose implementations may differ. No claims or entitlements can be derived from local evaluation results.
+# test_private_mixed (same command, different split)
+python -m industrial.test \
+    --data_dir /workspace/mvtec \
+    --out_dir ./output_submit \
+    --split test_private_mixed \
+    --inp_save_dir weights \
+    --tiling --target_tile 600 --batch_size 4 \
+    --cpr_checkpoints "log/mvtec_train_v2/{category}/03000.pth" \
+    --combine_mode gated_boost \
+    --auto_cpr_weight \
+    --guided --guided_eps 0.001 \
+    --evt_fdr 0.05 --cpr_power 1.5 \
+    --inp_val_dir "weights/INP-Former-Multi-Class_dataset=MVTec-AD_Encoder=dinov2reg_vit_base_14_Resize=448_Crop=392_INP_num=6/val_heatmaps" \
+    --cpr_val_dir output/cpr/val_heatmaps
+```
+
+### 3. Package Submission
+
+```bash
+tar czf submission.tar.gz -C output_submit anomaly_images anomaly_images_thresholded
+```
+
+Upload `submission.tar.gz` to [benchmark.mvtec.com](https://benchmark.mvtec.com/).
+
+### 4. Evaluate on test_public (optional)
+
+```bash
+python -m industrial.shared.seg_f1 ./output /workspace/mvtec
+```
+
+## Training from Scratch
+
+### INP-Former
+
+```bash
+python -m industrial.train --model inp --phase train \
+    --data_path /workspace/mvtec --save_dir weights \
+    --tiling --target_tile 600 --total_epochs 15 \
+    --lighting_aug --lighting_min 0.02 --lighting_max 0.12
+```
+
+### CPR
+
+```bash
+# 1. Preprocessing (foreground, retrieval, synthetic data)
+python -m industrial.cpr.tools.generate_foreground -fd log/foreground
+python -m industrial.cpr.tools.generate_retrieval
+python -m industrial.cpr.tools.generate_synthetic_data -fd log/foreground
+
+# 2. Training
+python -m industrial.train --model cpr --phase train \
+    -lp log/mvtec_train_v2 \
+    --data-dir log/synthetic_mvtec_320_6000_True_jpg \
+    -fd log/foreground \
+    -rd log/retrieval_mvtec_DenseNet_features.denseblock1_320 \
+    --data-root /workspace/mvtec \
+    --steps 3000 -tps 1000 \
+    --lighting-prob 0.7 --lighting-min 0.02 --lighting-max 0.12
+```
+
+## Ensemble Configuration
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `combine_mode` | `gated_boost` | CPR boosts INP only where CPR is confident |
+| `auto_cpr_weight` | enabled | Per-category weight from edge correlation |
+| `guided_eps` | 0.001 | Guided filter epsilon |
+| `evt_fdr` | 0.05 | EVT false discovery rate |
+| `cpr_power` | 1.5 | Power applied to CPR signal |
+| `tiling` | 600 | Target tile size for INP-Former |
+
+## Results (test_public)
+
+| Category | SegF1 | Precision | Recall |
+|----------|-------|-----------|--------|
+| can | 0.003 | 0.001 | 0.101 |
+| fabric | 0.237 | 0.339 | 0.182 |
+| fruit_jelly | 0.628 | 0.812 | 0.511 |
+| rice | 0.662 | 0.646 | 0.679 |
+| sheet_metal | 0.452 | 0.654 | 0.345 |
+| vial | 0.386 | 0.609 | 0.283 |
+| wallplugs | 0.142 | 0.101 | 0.237 |
+| walnuts | 0.665 | 0.639 | 0.692 |
+| **Mean** | **0.397** | **0.475** | **0.379** |
 
 ## License
 
-Original code: Apache-2.0 (Intel Corporation)
-Code derived from MVTec: CC-BY-NC-4.0 (MVTec Software GmbH)
+CC-BY-NC-4.0
