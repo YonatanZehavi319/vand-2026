@@ -126,9 +126,9 @@ python -m industrial.train --model inp --phase train \
 
 ```bash
 # 1. Preprocessing (foreground, retrieval, synthetic data)
-python -m industrial.cpr.tools.generate_foreground -fd log/foreground
-python -m industrial.cpr.tools.generate_retrieval
-python -m industrial.cpr.tools.generate_synthetic_data -fd log/foreground
+python -m industrial.cpr.tools.generate_foreground -fd log/foreground --data-root /workspace/mvtec
+python -m industrial.cpr.tools.generate_retrieval --data-root /workspace/mvtec
+python -m industrial.cpr.tools.generate_synthetic_data -fd log/foreground --data-root /workspace/mvtec --dtd-dir /workspace/dtd/images
 
 # 2. Training
 python -m industrial.train --model cpr --phase train \
