@@ -164,12 +164,14 @@ def run_ensemble(args):
             cpr_sub = os.path.join(cpr_cat_dir, sub_dir)
 
             # Output dirs
-            heatmap_out = os.path.join(args.out_dir, 'heatmaps', category, sub_dir)
+            save_viz = getattr(args, 'save_viz', False)
             anomaly_out = os.path.join(args.out_dir, 'anomaly_images', category, sub_dir)
             thresh_out = os.path.join(args.out_dir, 'anomaly_images_thresholded', category, sub_dir)
-            os.makedirs(heatmap_out, exist_ok=True)
             os.makedirs(anomaly_out, exist_ok=True)
             os.makedirs(thresh_out, exist_ok=True)
+            if save_viz:
+                heatmap_out = os.path.join(args.out_dir, 'heatmaps', category, sub_dir)
+                os.makedirs(heatmap_out, exist_ok=True)
 
             inp_heatmaps = sorted(glob(os.path.join(inp_sub, '*_heatmap_raw.npy')))
 
@@ -202,8 +204,9 @@ def run_ensemble(args):
                 if category in spatial_priors_per_cat:
                     combined = combined * spatial_priors_per_cat[category]
 
-                # Save heatmap visualization
-                plt.imsave(os.path.join(heatmap_out, f'{fname}_heatmap.png'), combined, cmap='jet')
+                # Save heatmap visualization (optional)
+                if save_viz:
+                    plt.imsave(os.path.join(heatmap_out, f'{fname}_heatmap.png'), combined, cmap='jet')
 
                 # Save float16 TIFF (submission format)
                 combined_f16 = combined.astype(np.float16)
@@ -248,20 +251,20 @@ def run_ensemble(args):
                 # Save binary PNG (submission format)
                 cv2.imwrite(os.path.join(thresh_out, f'{fname}.png'), pred_mask)
 
-                # Also save in heatmaps dir for evaluation
-                plt.imsave(os.path.join(heatmap_out, f'{fname}_binary.png'), pred_mask, cmap='gray')
+                if save_viz:
+                    plt.imsave(os.path.join(heatmap_out, f'{fname}_binary.png'), pred_mask, cmap='gray')
 
-                # Copy GT if exists (check AD 2 then AD 1 layout)
-                if args.data_dir:
-                    gt_path_ad2 = os.path.join(args.data_dir, category, 'test_public', 'ground_truth', sub_dir, f'{fname}_mask.png')
-                    gt_path_ad1 = os.path.join(args.data_dir, category, 'ground_truth', sub_dir, f'{fname}_mask.png')
-                    gt_path = gt_path_ad2 if os.path.exists(gt_path_ad2) else gt_path_ad1
-                    if os.path.exists(gt_path):
-                        gt = cv2.imread(gt_path, cv2.IMREAD_GRAYSCALE)
-                        gt_resized = cv2.resize(gt, (save_size, save_size), interpolation=cv2.INTER_NEAREST)
-                        plt.imsave(os.path.join(heatmap_out, f'{fname}_gt.png'), gt_resized, cmap='gray')
+                    # Copy GT if exists (check AD 2 then AD 1 layout)
+                    if args.data_dir:
+                        gt_path_ad2 = os.path.join(args.data_dir, category, 'test_public', 'ground_truth', sub_dir, f'{fname}_mask.png')
+                        gt_path_ad1 = os.path.join(args.data_dir, category, 'ground_truth', sub_dir, f'{fname}_mask.png')
+                        gt_path = gt_path_ad2 if os.path.exists(gt_path_ad2) else gt_path_ad1
+                        if os.path.exists(gt_path):
+                            gt = cv2.imread(gt_path, cv2.IMREAD_GRAYSCALE)
+                            gt_resized = cv2.resize(gt, (save_size, save_size), interpolation=cv2.INTER_NEAREST)
+                            plt.imsave(os.path.join(heatmap_out, f'{fname}_gt.png'), gt_resized, cmap='gray')
 
-                plt.close('all')
+                    plt.close('all')
 
         print(f"  {category}: {n_combined} images combined")
 
@@ -318,6 +321,7 @@ def main():
     parser.add_argument('--spatial_prior', action='store_true', help='Apply spatial FP suppression from validation')
     parser.add_argument('--grid_size', type=int, default=4, help='Grid size for spatial prior (default 4)')
     parser.add_argument('--suppress_floor', type=float, default=0.3, help='Min suppression weight (default 0.3, lower=more aggressive)')
+    parser.add_argument('--save_viz', action='store_true', help='Save heatmap visualizations, binary masks, and GT copies')
 
     args = parser.parse_args()
     run_ensemble(args)

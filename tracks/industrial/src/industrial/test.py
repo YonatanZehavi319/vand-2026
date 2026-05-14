@@ -63,6 +63,7 @@ def main() -> None:
     parser.add_argument('--spatial_prior', action='store_true', help='Apply spatial FP suppression')
     parser.add_argument('--grid_size', type=int, default=4, help='Grid size for spatial prior')
     parser.add_argument('--suppress_floor', type=float, default=0.3, help='Min suppression weight')
+    parser.add_argument('--save_viz', action='store_true', help='Save heatmap visualizations and GT copies')
 
     args = parser.parse_args()
 
@@ -179,6 +180,7 @@ def main() -> None:
         ens.spatial_prior = args.spatial_prior
         ens.grid_size = args.grid_size
         ens.suppress_floor = args.suppress_floor
+        ens.save_viz = args.save_viz
 
         run_ensemble(ens)
 
