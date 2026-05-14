@@ -40,12 +40,14 @@ tar xzf cpr_weights.tar.gz -C log/mvtec_train_v2/
 
 ## Dataset
 
-Download MVTec AD 2 from [mvtec.com](https://www.mvtec.com/company/research/datasets/mvtec-ad-2) and extract to `/workspace/mvtec/`.
+**MVTec AD 2**: Download from [mvtec.com](https://www.mvtec.com/company/research/datasets/mvtec-ad-2) and extract to `/workspace/mvtec/`. The directory should contain category folders (`can/`, `fabric/`, etc.) each with `train/`, `validation/`, `test_public/`, `test_private/`, `test_private_mixed/`.
 
-CPR also requires:
+**DTD (Describable Textures Dataset)**: Required for CPR synthetic data generation. Download from [robots.ox.ac.uk/~vgg/data/dtd](https://www.robots.ox.ac.uk/~vgg/data/dtd/) and extract to `/workspace/dtd/`.
+
+CPR preprocessing generates these from the above datasets:
 - Foreground masks: `log/foreground/`
 - Retrieval index: `log/retrieval_mvtec_DenseNet_features.denseblock1_320/`
-- Synthetic data: `log/synthetic_mvtec_320_6000_True_jpg/`
+- Synthetic data: `log/synthetic_mvtec_320_6000_True_jpg/` (uses DTD textures + Perlin noise)
 
 These are generated during CPR preprocessing (see Training section).
 
