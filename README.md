@@ -67,8 +67,17 @@ python -m industrial.train --model cpr --phase validation \
 
 ### 2. Run Inference on Private Test Splits
 
+All best settings are defaults, so the commands are simple:
+
 ```bash
-# test_private
+python -m industrial.test --data_dir /workspace/mvtec --out_dir ./output_submit --split test_private
+python -m industrial.test --data_dir /workspace/mvtec --out_dir ./output_submit --split test_private_mixed
+```
+
+<details>
+<summary>Full explicit command (equivalent)</summary>
+
+```bash
 python -m industrial.test \
     --data_dir /workspace/mvtec \
     --out_dir ./output_submit \
@@ -82,21 +91,8 @@ python -m industrial.test \
     --evt_fdr 0.05 --cpr_power 1.5 \
     --inp_val_dir "weights/INP-Former-Multi-Class_dataset=MVTec-AD_Encoder=dinov2reg_vit_base_14_Resize=448_Crop=392_INP_num=6/val_heatmaps" \
     --cpr_val_dir output/cpr/val_heatmaps
-
-# test_private_mixed (same command, different split)
-python -m industrial.test \
-    --data_dir /workspace/mvtec \
-    --out_dir ./output_submit \
-    --split test_private_mixed \
-    --inp_save_dir weights \
-    --tiling --target_tile 600 --batch_size 4 \
-    --cpr_checkpoints "log/mvtec_train_v2/{category}/03000.pth" \
-    --combine_mode gated_boost \
-    --auto_cpr_weight \
-    --guided --guided_eps 0.001 \
-    --evt_fdr 0.05 --cpr_power 1.5 \
-    --inp_val_dir "weights/INP-Former-Multi-Class_dataset=MVTec-AD_Encoder=dinov2reg_vit_base_14_Resize=448_Crop=392_INP_num=6/val_heatmaps" \
-    --cpr_val_dir output/cpr/val_heatmaps
+```
+</details>
 ```
 
 ### 3. Package Submission
