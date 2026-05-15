@@ -29,8 +29,8 @@ pip install matplotlib numpy==1.26.4 opencv-contrib-python
 Download from [GitHub Releases](https://github.com/YonatanZehavi319/vand-2026/releases/tag/v1.0):
 
 ```bash
-# INP-Former weights (split into 2 parts)
-cat inp_weights_part_aa inp_weights_part_ab > inp_weights.tar.gz
+# INP-Former weights (split into 3 parts)
+cat inp_weights_25ep_part_aa inp_weights_25ep_part_ab inp_weights_25ep_part_ac > inp_weights.tar.gz
 mkdir -p weights/INP-Former-Multi-Class_dataset=MVTec-AD_Encoder=dinov2reg_vit_base_14_Resize=448_Crop=392_INP_num=6
 tar xzf inp_weights.tar.gz -C weights/INP-Former-Multi-Class_dataset=MVTec-AD_Encoder=dinov2reg_vit_base_14_Resize=448_Crop=392_INP_num=6/
 
@@ -118,7 +118,7 @@ python -m industrial.shared.seg_f1 ./output /workspace/mvtec
 ```bash
 python -m industrial.train --model inp --phase train \
     --data_path /workspace/mvtec --save_dir weights \
-    --tiling --target_tile 600 --total_epochs 15 \
+    --tiling --target_tile 600 --total_epochs 25 \
     --lighting_aug --lighting_min 0.02 --lighting_max 0.12
 ```
 
