@@ -2,7 +2,7 @@
 
 Anomaly detection and segmentation on MVTec AD 2, combining **INP-Former** and **CPR** with a gated boost ensemble strategy.
 
-**Team:** Yonatan Zehavi — Hebrew University of Jerusalem
+**Team:** Yonatan Zehavi (Hebrew University of Jerusalem), Niv Cohen (New York University)
 
 ## Method Summary
 
